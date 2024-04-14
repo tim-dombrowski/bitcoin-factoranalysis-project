@@ -1,0 +1,580 @@
+---
+title: "Bitcoin Factor Analysis"
+output: html_notebook
+---
+
+## Preliminary Work: Install/Load Packages
+
+To try and ensure that this R Notebook will run successfully, we'll use the [renv package](https://cran.r-project.org/web/packages/renv/index.html) to create a project-specific library of packages. This will allow us to install the packages that we need for this project without affecting any other projects that we may be working on. Additionally, the project library will track the specific versions of the dependency packages so that any updates to those packages will not break this project.
+
+The code chunk below will first install the renv package if it is not already installed. Then we will load the package. Next, we'll use the `restore()` function to install any packages listed in the renv.lock file. Once these packages are installed, we can load them into the R session using the `library()` commands. Below the code chunk, we'll list out the packages that will be used in the project demo. And if you run into any trouble using renv, then you can use the second code chunk below and that should be an even more reliable approach to install the required packages.
+
+```{r setup, results='hide', message=FALSE}
+# Install renv package if not already installed
+if(!"renv" %in% installed.packages()[,"Package"]) install.packages("renv")
+# Load renv package
+library(renv)
+# Use restore() to install any packages listed in the renv.lock file
+renv::restore(clean=TRUE, lockfile="../renv.lock")
+# Load in the packages
+library(quantmod)
+library(tidyverse)
+library(jsonlite)
+library(tseries)
+library(corrplot)
+```
+
+* The [quantmod package](https://cran.r-project.org/package=quantmod) contains tools for importing and analyzing financial data.
+* The [tidyverse package](https://www.tidyverse.org/) contains a suite of packages for data manipulation and visualization.
+* The [jsonlite package](https://cran.r-project.org/package=jsonlite) lets us more easily import JSON data.
+* The [tseries package](https://cran.r-project.org/package=tseries) contains additional time series analysis functions that we will explore.
+* The [rmarkdown package](https://cran.r-project.org/package=rmarkdown) is used to generate this R Notebook.
+
+Since the rmarkdown functionality is built into RStudio, this last one is automatically loaded when you open RStudio. So no need to use the `library()` function for it. Another observation to make about the code chunk above is that it is labeled as `setup`, which is a special name, which the R Notebook will recognize and automatically run prior to running any other code chunk. This is useful for loading in packages and setting up other global options that will be used throughout the notebook. 
+
+Then if you wish to try and update the versions of the various R packages in the lock file, you can use the `renv::update()` function to update the packages in the project library. However, it is possible that these updates could break the code in this notebook. If so, you may need to adapt the code to work with the updated packages.
+
+My recommendation is to first run through the code using the versions of the packages in the lock file. Then if you want to try and update the packages, you can do so and then run through the code again to see if it still works. If not, you can always revert back to the lock file versions using the `renv::restore()` function.
+
+If you update the packages and get everything working successfully, then you can update the lock file using the `renv::snapshot()` function. This will update the lock file with the versions of the packages that are currently installed in the project library. Then you can commit the updated lock file to the repository so that others can use the updated versions of the packages.
+
+### Alternative Package Installation Code
+
+If you run into any trouble using renv in the code chunk above, then you can use the code chunk below to install the required packages for this analysis. This method will first check if you have already installed the packages. If any are missing, it will then install them. Then it will load the packages into the R session. A potential flaw in this approach compared to using renv is that it will simply install the latest versions of the packages, which could potentially break some of the code in this notebook if any of the updates aren't backwards compatible. 
+
+As long as you have downloaded the entire project repository, the renv chunk above will likely be managing the packages. Thus, the `eval=FALSE` option is used to prevent this chunk from running unless manually executed. So if you only downloaded this one Rmd file, this code chunk should take care of installing the packages for you.
+
+```{r setup2, results='hide', message=FALSE, eval=FALSE}
+# Create list of packages needed for this exercise, omit geckor since its not on CRAN
+list.of.packages = c("quantmod","tidyverse","jsonlite","tseries","rmarkdown")
+# Check if any have not yet been installed
+new.packages = list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+# If any need to be installed, install them
+if(length(new.packages)) install.packages(new.packages)
+# Since geckor is no longer published to CRAN, install via GitHub
+library(quantmod)
+library(tidyverse)
+library(jsonlite)
+library(tseries)
+```
+
+
+## Data Imports
+
+This section will build out a cleaned dataset for use in the subsequent analysis. To start, we'll import the bitcoin price data from Yahoo Finance using the quantmod package. Additionally, we'll collect data for a few other similar assets to compare with BTC. Then we'll import the factor data from Kenneth French's website to see if known equity factors explain bitcoin returns. Lastly, we'll import some more bitcoin-specific data to make a more tailored asset pricing model.
+
+### Asset Data Import and Cleaning
+
+The `getSymbols()` function from the quantmod package let's use import the daily price data for the various assets. The `src="yahoo"` argument specifies that we want to pull the data from Yahoo Finance. The `from` and `to` arguments specify the date range for the data, which goes back to October 2014 for BTC. Rather that assigning a variable name to the output of `getSymbols()`, the function creates a new variable for each ticker in the list, named after the ticker. The last few lines of the code chunk below show how to rename the variable to something more manageable.
+
+Currently, the additional assets beyond bitcoin (BTC) include:
+
+* Grayscale Bitcoin Trust/ETF (GBTC)
+* Microstrategy stock (MSTR)
+* Ethereum (ETH)
+* Wrapped Bitcoin (WBTC)
+
+```{r assetdata, results='hide'}
+startdate = "2014-10-01"
+tickers = c("BTC-USD","GBTC","MSTR","ETH-USD","WBTC-USD")
+getSymbols(tickers,
+           src="yahoo",
+           from=startdate,
+           to=Sys.Date())
+BTC = `BTC-USD`
+ETH = `ETH-USD`
+WBTC = `WBTC-USD`
+```
+
+Now that we have the daily price series, let's extract the close prices into a univariate xts object. Then we can rename the column to `"Close"` to keep variable names simple. After that, let's aggregate the daily prices to a monthly series. The xts package (which is a dependency of quantmod) allows us to easily convert the daily price data into a monthly OHLC series using  `to.monthly()`. The `name=NULL` option in those functions prevents the variable names from including the name of the original object.
+
+```{r assetfreq}
+# Create daily series and rename column
+BTCdaily = BTC$`BTC-USD.Close` 
+names(BTCdaily) = "Close"
+# Convert to monthly series
+BTCmonthOHLC = to.monthly(BTCdaily$Close, name=NULL)
+BTCmonth = BTCmonthOHLC$Close
+# Same for GBTC
+GBTCdaily = GBTC$GBTC.Close
+names(GBTCdaily) = "Close"
+GBTCmonthOHLC = to.monthly(GBTCdaily$Close, name=NULL)
+GBTCmonth = GBTCmonthOHLC$Close
+# Same for MSTR
+MSTRdaily = MSTR$MSTR.Close
+names(MSTRdaily) = "Close"
+MSTRmonthOHLC = to.monthly(MSTRdaily$Close, name=NULL)
+MSTRmonth = MSTRmonthOHLC$Close
+# Same for ETH
+ETHdaily = ETH$`ETH-USD.Close` 
+names(ETHdaily) = "Close"
+ETHmonthOHLC = to.monthly(ETHdaily$Close, name=NULL)
+ETHmonth = ETHmonthOHLC$Close
+# Same for WBTC
+WBTCdaily = WBTC$`WBTC-USD.Close` 
+names(WBTCdaily) = "Close"
+WBTCmonthOHLC = to.monthly(WBTCdaily$Close, name=NULL)
+WBTCmonth = WBTCmonthOHLC$Close
+```
+
+Lastly, we'll convert the monthly price series into annualized return series. This can be done directly by composing the `diff()` and `log()` functions. The `log()` function will take the natural logarithm of the prices, and then the `diff()` function will subtract the previous period's value from the current period's value. Then to make the series more comparable, we'll annualize the returns by multiplying by 12. Lastly, we'll adjust the units to percentages.
+
+```{r assetrets}
+# Calculate annualized returns
+BTCmonth$AnnRet = diff(log(BTCmonth$Close))*12*100
+GBTCmonth$AnnRet = diff(log(GBTCmonth$Close))*12*100
+MSTRmonth$AnnRet = diff(log(MSTRmonth$Close))*12*100
+ETHmonth$AnnRet = diff(log(ETHmonth$Close))*12*100
+WBTCmonth$AnnRet = diff(log(WBTCmonth$Close))*12*100
+```
+
+
+### Fama/French Factors
+
+To model the asset returns, we'll import the Fama/French Factors. The earlier [Fama and French (1993)](https://doi.org/10.1016/0304-405X(93)90023-5) paper introduced a three-factor model that includes SMB (Small Minus Big) as a 'size' factor and HML (High Minus Low) as a 'value'/'growth' factor. See [the 3-Factors webpage](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/f-f_factors.html) for more detail. The data is also available there at the url in the data chunk below. Since these are available as compressed folders, we must first download the file (we'll put it in a sub-folder, Factor Data) and then decompress (unzip) the file before reading in the data. *Note the extra entry in the .gitignore file for the repository. This prevents git from syncing the datasets to the repo.*
+
+```{r ff3download}
+ff3url = "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_Factors_CSV.zip"
+# Create subdirectory for file downloads
+subdirectory = "Factor Data"
+dir.create(subdirectory, showWarnings=FALSE)
+# Define the file paths
+zip_filepath = file.path(subdirectory, "FF3-factors.zip")
+csv_filepath = file.path(subdirectory, "FF3-factors.csv")
+# Download the zip file
+download.file(ff3url, destfile=zip_filepath)
+# Extract the CSV file from the zip file
+unzip(zip_filepath, exdir=subdirectory)
+# The file name in the line below comes from the name of the file within the zipped file
+file.rename("Factor Data/F-F_Research_Data_Factors.CSV", csv_filepath)
+FF3 = read_csv(csv_filepath,
+               col_types = cols(...1 = col_date(format = "%Y%m")), 
+               skip = 2)
+```
+
+The code chunk above reports a warning about some parsing errors. So let's investigate with `problems()`.
+
+```{r ff3probs}
+problems(FF3)
+```
+
+Note how it refers us to the bottom of the data frame. These are the annual observations that are included below the monthly data. Since those annual dates do not import and are missing, we can use `complete.cases()` to easily identify the appropriate columns to retain. Then the date variable imports with an unusual name of `...1`, so we'll fix that, and then reformat to an xts object. Lastly, we use the `paste()` function to generate a string of `"2014-10-01/"`. This type of indexing is part of the xts package, and the `/` separates a start date from an end date. 
+
+```{r ff3cleaning}
+# Trim annual observations from bottom of date frame (dates import as missing)
+FF3 = FF3[complete.cases(FF3),]
+# Fix date variable name
+FF3 = FF3 |> rename(Date=...1)
+FF3 = FF3 |> rename(MktRF=`Mkt-RF`)
+# Reformat to xts object
+FF3xts = xts(FF3[,-1], order.by=FF3$Date)
+# Remove data prior to first BTC observation
+FF3xts = FF3xts[paste(startdate,"/",sep="")]
+# Annualize factor data to match annualized return scaling (use RF as reference point)
+FF3xts = FF3xts*12
+```
+
+More recently, [Fama and French (2015)](https://doi.org/10.1016/j.jfineco.2014.10.010) includes two additional factors: RMW (Robust Minus Weak) as a 'profitability' factor and CMA (Conservative Minus Aggressive) factor. The [5-Factors webpage](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/f-f_5_factors_2x3.html) has more detail.
+
+```{r ff5data}
+ff5url = "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_5_Factors_2x3_CSV.zip"
+# Define the file paths
+zip_filepath = file.path(subdirectory, "FF5-factors.zip")
+csv_filepath = file.path(subdirectory, "FF5-factors.csv")
+# Download the zip file
+download.file(ff5url, destfile=zip_filepath)
+# Extract the CSV file from the zip file
+unzip(zip_filepath, exdir=subdirectory)
+file.rename("Factor Data/F-F_Research_Data_5_Factors_2x3.CSV", csv_filepath)
+FF5 = read_csv(csv_filepath,
+               col_types = cols(...1 = col_date(format = "%Y%m")), 
+               skip = 2)
+# Trim annual observations from bottom of date frame (dates import as missing)
+FF5 = FF5[complete.cases(FF5),]
+# Fix date variable name
+FF5 = FF5 |> rename(Date=...1)
+FF5 = FF5 |> rename(MktRF=`Mkt-RF`)
+# Reformat numbers to numeric type and annualize
+FF5$MktRF = as.numeric(FF5$MktRF)*12
+FF5$SMB = as.numeric(FF5$SMB)*12
+FF5$HML = as.numeric(FF5$HML)*12
+FF5$RMW = as.numeric(FF5$RMW)*12
+FF5$CMA = as.numeric(FF5$CMA)*12
+FF5$RF = as.numeric(FF5$RF)*12
+# Reformat to xts object
+FF5xts = xts(FF5[,-1], order.by=FF5$Date)
+# Remove data prior to first BTC observation
+FF5xts = FF5xts[paste(startdate,"/",sep="")]
+```
+
+## Summary Statistics
+
+Before running the factor model regressions, let's first calculate some summary statistics and generate some basic plots for the assets. We'll start by consolidating the asset prices into a single xts object and the returns into another.
+
+```{r consolidateassets}
+assetprices = merge(BTCmonth$Close,
+                    GBTCmonth$Close,
+                    MSTRmonth$Close,
+                    ETHmonth$Close,
+                    WBTCmonth$Close)
+colnames(assetprices) = c("BTC","GBTC","MSTR","ETH","WBTC")
+assetreturns = merge(BTCmonth$AnnRet,
+                     GBTCmonth$AnnRet,
+                     MSTRmonth$AnnRet,
+                     ETHmonth$AnnRet,
+                     WBTCmonth$AnnRet)
+colnames(assetreturns) = c("BTC","GBTC","MSTR","ETH","WBTC")
+```
+
+Since some assets have been around longer than others, let's create a subset of the series that includes only the time period where all assets have data. This will allow for more direct comparisons between the assets. Currently, the most recent asset is WBTC, which has price data back to January 2019.
+
+```{r trimassets}
+assetprices_full = assetprices[complete.cases(assetprices),]
+assetreturns_full = assetreturns[complete.cases(assetreturns),]
+```
+
+### Univariate Plots
+
+First, lets visualize each of the price and return series. For prices, we'll use line plots. For returns, we'll use bar plots.
+
+```{r tsplots}
+# Plot the asset prices
+ggplot(data=assetprices_full, aes(x=index(assetprices_full), y=BTC)) + geom_line() + xlab("")
+ggplot(data=assetprices_full, aes(x=index(assetprices_full), y=GBTC)) + geom_line() + xlab("")
+ggplot(data=assetprices_full, aes(x=index(assetprices_full), y=MSTR)) + geom_line() + xlab("")
+ggplot(data=assetprices_full, aes(x=index(assetprices_full), y=ETH)) + geom_line() + xlab("")
+ggplot(data=assetprices_full, aes(x=index(assetprices_full), y=WBTC)) + geom_line() + xlab("")
+# Plot the asset returns
+ggplot(data=assetreturns_full, aes(x=index(assetreturns_full), y=BTC)) + geom_col() + xlab("")
+ggplot(data=assetreturns_full, aes(x=index(assetreturns_full), y=GBTC)) + geom_col() + xlab("")
+ggplot(data=assetreturns_full, aes(x=index(assetreturns_full), y=MSTR)) + geom_col() + xlab("")
+ggplot(data=assetreturns_full, aes(x=index(assetreturns_full), y=ETH)) + geom_col() + xlab("")
+ggplot(data=assetreturns_full, aes(x=index(assetreturns_full), y=WBTC)) + geom_col() + xlab("")
+```
+
+Another way to visualize the returns of each series is to use a density plot. This will allow us to compare the distribution of returns for the assets. The `facet_wrap()` function will allow us to compare the assets side-by-side. *This component of the analysis was recommended by GitHub Copilot.*
+
+```{r densityplots}
+# Combine returns into a single data frame
+assetreturnsdf = data.frame(index(assetreturns_full), assetreturns_full)
+colnames(assetreturnsdf) = c("Date","BTC","GBTC","MSTR","ETH","WBTC")
+assetreturnsdf = assetreturnsdf |> pivot_longer(cols=-Date, names_to="Asset", values_to="Return")
+# Plot the density of returns
+ggplot(data=assetreturnsdf, aes(x=Return, fill=Asset)) + 
+  geom_density(alpha=0.5) + 
+  facet_wrap(~Asset)
+```
+
+### Univariate Statistics
+
+Next, let's compute some univariate statistics for the asset returns. We'll calculate the mean, standard deviation, and the ratio of those two for a measure of risk-adjusted return.
+
+```{r univstats} 
+# Asset average annual returns
+assetsEr = colMeans(assetreturns_full, na.rm=TRUE)
+assetsEr |> round(2)
+# Asset standard deviations
+assetsSd = apply(assetreturns_full, 2, sd, na.rm=TRUE)
+assetsSd |> round(2)
+# Asset risk-adjusted returns
+(assetsEr/assetsSd) |> round(4)
+```
+
+### Multivariate Statistics
+
+At the multivariate level, we can calculate the correlation matrix for the asset returns. This will allow us to see how the assets move together. We can also create a correlation plot to visualize the relationships.
+
+```{r assetcorrs}
+cor(assetreturns_full) |> round(4)
+# Create a correlation plot for the daily returns
+corrplot(cor(assetreturns_full), method="color")
+```
+
+
+## Factor Model Regressions
+
+### CAPM and Fama/French 3-Factor Models
+
+Since the FF3 factor model is an extension of the traditional CAPM and includes the data for applying CAPM, let's start with those two. First, let's collect all the necessary data into a single xts object. Then we'll run the regressions for each asset. 
+
+```{r ff3prep}
+# Compile xts object with all asset returns and factors
+assets_ff3 = merge(assetreturns_full,
+                   FF3xts)
+# Correct variable names
+colnames(assets_ff3) = c("BTC","GBTC","MSTR","ETH","WBTC","MktRF","SMB","HML","RF")
+# Calculate risk premiums for assets
+assets_ff3$BTCxs = assets_ff3$BTC - assets_ff3$RF
+assets_ff3$GBTCxs = assets_ff3$GBTC - assets_ff3$RF
+assets_ff3$MSTRxs = assets_ff3$MSTR - assets_ff3$RF
+assets_ff3$ETHxs = assets_ff3$ETH - assets_ff3$RF
+assets_ff3$WBTCxs = assets_ff3$WBTC - assets_ff3$RF
+# Trim any observations with missing data
+assets_ff3_full = assets_ff3[complete.cases(assets_ff3),]
+```
+
+Before running the regressions, let's calculate the correlation matrix and plot for the asset risk premiums and the factors.
+
+```{r ff3stats}
+cor(assets_ff3_full[,-c(1:5)]) |> round(2)
+corrplot(cor(assets_ff3_full[,-c(1:5)]), method="color")
+```
+
+#### CAPM Regressions
+
+Now let's start with the CAPM regressions for the full series of each asset. The `lm()` function fits a linear regression model of the asset risk premium on the market risk premium.
+
+```{r capmregs}
+# Bitcoin CAPM regression
+CAPMreg_BTC = lm(BTCxs~MktRF, data=assets_ff3_full)
+summary(CAPMreg_BTC)
+# GBTC CAPM regression
+CAPMreg_GBTC = lm(GBTCxs~MktRF, data=assets_ff3_full)
+summary(CAPMreg_GBTC)
+# MSTR CAPM regression
+CAPMreg_MSTR = lm(MSTRxs~MktRF, data=assets_ff3_full)
+summary(CAPMreg_MSTR)
+# Ethereum CAPM regression
+CAPMreg_ETH = lm(ETHxs~MktRF, data=assets_ff3_full)
+summary(CAPMreg_ETH)
+# Wrapped Bitcoin CAPM regression
+CAPMreg_WBTC = lm(WBTCxs~MktRF, data=assets_ff3_full)
+summary(CAPMreg_WBTC)
+```
+
+#### Fama/French 3-Factor Models
+
+Now let's apply the 3-factor model.
+
+```{r ff3regs}
+# Bitcoin FF3 regression
+FF3reg_BTC = lm(BTCxs~MktRF+SMB+HML, data=assets_ff3_full)
+summary(FF3reg_BTC)
+# GBTC FF3 regression
+FF3reg_GBTC = lm(GBTCxs~MktRF+SMB+HML, data=assets_ff3_full)
+summary(FF3reg_GBTC)
+# MSTR FF3 regression
+FF3reg_MSTR = lm(MSTRxs~MktRF+SMB+HML, data=assets_ff3_full)
+summary(FF3reg_MSTR)
+# Ethereum FF3 Regression
+FF3reg_ETH = lm(ETHxs~MktRF+SMB+HML, data=assets_ff3_full)
+summary(FF3reg_ETH)
+# Wrapped Bitcoin FF3 Regression
+FF3reg_WBTC = lm(WBTCxs~MktRF+SMB+HML, data=assets_ff3_full)
+summary(FF3reg_WBTC)
+```
+
+### Fama/French 5-Factor Models
+
+Next, we'll replicate that process with the FF5 factors. First, merge the data together and trim missing observations.
+
+```{r ff5prep}
+# Compile xts object with all asset returns and factors
+assets_ff5 = merge(assetreturns_full,
+                   FF5xts)
+# Correct variable names
+colnames(assets_ff5) = c("BTC","GBTC","MSTR","ETH","WBTC","MktRF","SMB","HML","RMW","CMA","RF")
+# Calculate risk premiums for assets
+assets_ff5$BTCxs = assets_ff5$BTC - assets_ff5$RF
+assets_ff5$GBTCxs = assets_ff5$GBTC - assets_ff5$RF
+assets_ff5$MSTRxs = assets_ff5$MSTR - assets_ff5$RF
+assets_ff5$ETHxs = assets_ff5$ETH - assets_ff5$RF
+assets_ff5$WBTCxs = assets_ff5$WBTC - assets_ff5$RF
+# Trim any observations with missing data
+assets_ff5_full = assets_ff5[complete.cases(assets_ff5),]
+```
+
+Compute and visualize correlations between assets and factors:
+
+```{r ff5stats}
+cor(assets_ff5_full[,-c(1:5)]) |> round(2)
+corrplot(cor(assets_ff5_full[,-c(1:5)]), method="color")
+```
+
+Run the FF5 factor regressions:
+
+```{r ff5regs}
+# Bitcoin FF5 regression
+FF5reg_BTC = lm(BTCxs~MktRF+SMB+HML+RMW+CMA, data=assets_ff5_full)
+summary(FF5reg_BTC)
+# GBTC FF5 regression
+FF5reg_GBTC = lm(GBTCxs~MktRF+SMB+HML+RMW+CMA, data=assets_ff5_full)
+summary(FF5reg_GBTC)
+# MSTR FF5 regression
+FF5reg_MSTR = lm(MSTRxs~MktRF+SMB+HML+RMW+CMA, data=assets_ff5_full)
+summary(FF5reg_MSTR)
+# Ethereum FF5 Regression
+FF5reg_ETH = lm(ETHxs~MktRF+SMB+HML+RMW+CMA, data=assets_ff5_full)
+summary(FF5reg_ETH)
+# Wrapped Bitcoin FF5 Regression
+FF5reg_WBTC = lm(WBTCxs~MktRF+SMB+HML+RMW+CMA, data=assets_ff5_full)
+summary(FF5reg_WBTC)
+```
+
+
+### Other Bitcoin-Related Factors
+
+*This section is still a work-in-progress.*
+
+#### Trading Volume Growth as a Factor
+
+
+
+```{r volregs}
+# Select relevant variables and merge into a single xts object
+assets_volregs = merge(dfs_month$bitcoin$annret,
+                       dfs_month$bitcoin$annret2,
+                       dfs_month$bitcoin$volgrowth,
+                       dfs_month$ethereum$annret,
+                       dfs_month$ethereum$annret2,
+                       dfs_month$ethereum$volgrowth,
+                       dfs_month$`wrapped-bitcoin`$annret,
+                       dfs_month$`wrapped-bitcoin`$annret2,
+                       dfs_month$`wrapped-bitcoin`$volgrowth)
+# Give unique variable names
+colnames(assets_volregs) = c("BTC_PriceRet", "BTC_MktCapRet", "BTC_VolGrowth",
+                         "ETH_PriceRet", "ETH_MktCapRet", "ETH_VolGrowth",
+                         "WBTC_PriceRet", "WBTC_MktCapRet", "WBTC_VolGrowth")
+# Bitcoin Regressions
+volregBTC1 = lm(BTC_PriceRet~BTC_VolGrowth, data=assets_volregs[is.finite(assets_volregs$BTC_VolGrowth)])
+summary(volregBTC1)
+volregBTC2 = lm(BTC_MktCapRet~BTC_VolGrowth, data=assets_volregs[is.finite(assets_volregs$BTC_VolGrowth)])
+summary(volregBTC2)
+# Ethereum Regressions
+volregETH1 = lm(ETH_PriceRet~ETH_VolGrowth, data=assets_volregs[is.finite(assets_volregs$ETH_VolGrowth)])
+summary(volregETH1)
+volregETH2 = lm(ETH_MktCapRet~ETH_VolGrowth, data=assets_volregs[is.finite(assets_volregs$ETH_VolGrowth)])
+summary(volregETH2)
+# Wrapped Bitcoin Regressions
+volregWBTC1 = lm(WBTC_PriceRet~WBTC_VolGrowth, data=assets_volregs[is.finite(assets_volregs$WBTC_VolGrowth)])
+summary(volregWBTC1)
+volregWBTC2 = lm(WBTC_MktCapRet~WBTC_VolGrowth, data=assets_volregs[is.finite(assets_volregs$WBTC_MktCapRet)])
+summary(volregWBTC2)
+```
+
+#### Bitcoin Mining Hashrate as a Factor
+
+```{r hashratedata}
+# Build endpoint url for hashrates
+mempoolbase = "https://mempool.space/api/v1/"
+hashrateendpt = "mining/hashrate/pools/"
+hashrateurl = paste(mempoolbase, hashrateendpt, sep="")
+# Make API call and read JSON response
+hashrateresponse = fromJSON(hashrateurl)
+```
+
+API response has two data tables: hashrates has total hashrates at daily frequency and the difficulty table is at a frequency that is roughly every other week. However, since the epoch length in Bitcoin is defined by 2016 blocks, rather than two weeks, there is some short-term variation in the timing. We shall see how well the `as.monthly()` function handles this conversion. 
+
+```{r hashratecleaning1}
+# Extract hashrate table and difficulty table
+hashratedf = hashrateresponse$hashrates
+difficultydf = hashrateresponse$difficulty
+# Reformat dates from unix time to R date
+hashratedf$date = hashratedf$timestamp |> as.POSIXct() |> as.Date()
+difficultydf$date = difficultydf$time |> as.POSIXct() |> as.Date()
+```
+
+```{r hashratecleaning2}
+hashratexts_daily = xts(hashratedf[,1:2], order.by=hashratedf$date)
+hashratexts = to.monthly(hashratexts_daily$avgHashrate)
+# Correct variable names
+colnames(hashratexts) = c("BTChashrate_Open", "BTChashrate_High", "BTChashrate_Low", "BTChashrate_Close")
+# 
+hashratexts$BTChashrate_Mid = (hashratexts$BTChashrate_Open+hashratexts$BTChashrate_Close)/2
+```
+
+```{r pricevshashrate}
+ggplot(dfs_month$bitcoin,aes(x=Index, y=dailyxts.Close)) +
+  geom_line() +
+  xlab("") +
+  ggtitle("Monthly BTC Price Series (April 2013 - Present)")
+ggplot(hashratexts,aes(x=Index, y=BTChashrate_Close)) +
+  geom_line() +
+  xlab("") +
+  ggtitle("Monthly BTC Hashrate Series (January 2009 - Present)")
+```
+
+```{r hashgrowth}
+# Calculate annualized growth rate of each hashrate measurement
+hashratexts$loghash_High = log(hashratexts$BTChashrate_High)
+hashratexts$BTChashgrowth_High = (hashratexts$loghash_High - lag(hashratexts$loghash_High))*12*100
+hashratexts$loghash_Low = log(hashratexts$BTChashrate_Low)
+hashratexts$BTChashgrowth_Low = (hashratexts$loghash_Low - lag(hashratexts$loghash_Low))*12*100
+hashratexts$loghash_Close = log(hashratexts$BTChashrate_Close)
+hashratexts$BTChashgrowth_Close = (hashratexts$loghash_Close - lag(hashratexts$loghash_Close))*12*100
+hashratexts$loghash_Mid = log(hashratexts$BTChashrate_Mid)
+hashratexts$BTChashgrowth_Mid = (hashratexts$loghash_Mid - lag(hashratexts$loghash_Mid))*12*100
+```
+
+```{r hashregs}
+# Compile data frame of annualized crypto returns
+assets_hash = merge(dfs_month$bitcoin$annret,
+                   dfs_month$ethereum$annret,
+                   dfs_month$`wrapped-bitcoin`$annret,
+                   dfs_month$bitcoin$volgrowth,
+                   dfs_month$ethereum$volgrowth,
+                   dfs_month$`wrapped-bitcoin`$volgrowth)
+# Correct variable names
+colnames(assets_hash) = c("BTC", "ETH", "WBTC", "BTCvolgrowth", "ETHvolgrowth", "WBTCvolgrowth")
+# Merge to hashrate data
+assets_hash = merge(assets_hash[-1,], hashratexts)
+# Bitcoin hashrate regressions (High, no lag)
+hashreg_BTC_High_ALL = lm(BTC~BTChashgrowth_High, data=assets_hash)
+summary(hashreg_BTC_High_ALL)
+hashreg_BTC_High_5yr = lm(BTC~BTChashgrowth_High, data=tail(assets_hash,60))
+summary(hashreg_BTC_High_5yr)
+# Bitcoin hashrate regressions (High, 1mo lag)
+hashreg_BTC_High_ALL_lag = lm(BTC~lag(BTChashgrowth_High), data=assets_hash)
+summary(hashreg_BTC_High_ALL_lag)
+hashreg_BTC_High_5yr_lag = lm(BTC~lag(BTChashgrowth_High), data=tail(assets_hash,60))
+summary(hashreg_BTC_High_5yr_lag)
+# Bitcoin hashrate regressions (Close, no lag)
+hashreg_BTC_Close_ALL = lm(BTC~BTChashgrowth_Close, data=assets_hash)
+summary(hashreg_BTC_Close_ALL)
+hashreg_BTC_Close_5yr = lm(BTC~BTChashgrowth_Close, data=tail(assets_hash,60))
+summary(hashreg_BTC_Close_5yr)
+# Bitcoin hashrate regressions (Close, 1mo lag)
+hashreg_BTC_Close_ALL_lag = lm(BTC~lag(BTChashgrowth_Close), data=assets_hash)
+summary(hashreg_BTC_Close_ALL_lag)
+hashreg_BTC_Close_5yr_lag = lm(BTC~lag(BTChashgrowth_Close), data=tail(assets_hash,60))
+summary(hashreg_BTC_Close_5yr_lag)
+# Combine best hashrate measure with volume growth for two-factor model
+hashreg_BTC_opt = lm(BTC~BTCvolgrowth+lag(BTChashgrowth_Close), data=assets_hash[is.finite(assets_hash$BTCvolgrowth)])
+summary(hashreg_BTC_opt)
+```
+```{r hashcors}
+cor(assets_hash[is.finite(assets_hash$BTCvolgrowth)], use="pairwise.complete.obs") |> round(2)
+```
+
+```{r hashautocorr1}
+acf(hashratexts$BTChashrate_High)
+acf(hashratexts$BTChashrate_Low)
+acf(hashratexts$BTChashrate_Close)
+acf(hashratexts$BTChashrate_Mid)
+pacf(hashratexts$BTChashrate_High)
+pacf(hashratexts$BTChashrate_Low)
+pacf(hashratexts$BTChashrate_Close)
+pacf(hashratexts$BTChashrate_Mid)
+#
+adf.test(hashratexts$BTChashrate_High)
+adf.test(hashratexts$BTChashrate_Low)
+adf.test(hashratexts$BTChashrate_Close)
+adf.test(hashratexts$BTChashrate_Mid)
+```
+
+```{r hashautocorr2}
+acf(hashratexts$BTChashgrowth_High[is.finite(hashratexts$BTChashgrowth_High)])
+acf(hashratexts$BTChashgrowth_Low[is.finite(hashratexts$BTChashgrowth_Low)])
+acf(hashratexts$BTChashgrowth_Close[is.finite(hashratexts$BTChashgrowth_Close)])
+acf(hashratexts$BTChashgrowth_Mid[is.finite(hashratexts$BTChashgrowth_Mid)])
+pacf(hashratexts$BTChashgrowth_High[is.finite(hashratexts$BTChashgrowth_High)])
+pacf(hashratexts$BTChashgrowth_Low[is.finite(hashratexts$BTChashgrowth_Low)])
+pacf(hashratexts$BTChashgrowth_Close[is.finite(hashratexts$BTChashgrowth_Close)])
+pacf(hashratexts$BTChashgrowth_Mid[is.finite(hashratexts$BTChashgrowth_Mid)])
+#
+adf.test(hashratexts$BTChashgrowth_High[is.finite(hashratexts$BTChashgrowth_High)])
+adf.test(hashratexts$BTChashgrowth_Low[is.finite(hashratexts$BTChashgrowth_Low)])
+adf.test(hashratexts$BTChashgrowth_Close[is.finite(hashratexts$BTChashgrowth_Close)])
+adf.test(hashratexts$BTChashgrowth_Mid[is.finite(hashratexts$BTChashgrowth_Mid)])
+```
+
