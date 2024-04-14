@@ -2,22 +2,7 @@
 
 ### Overview
 
-This project aims to apply some traditional asset pricing models to the return series of bitcoin (BTC). 
-
-
-
-
-The initial data source will be crypto data from CoinGecko via the geckor package. In addition to the daily price data, the CoinGecko API provides daily market capitalizations and trading volumes, which will be explored as asset pricing factors. Additionally, we'll consider more traditional asset pricing factors, such as the Fama/French factors, which are shown not to explain bitcoin returns. Lastly, we'll consider some technical data from the Bitcoin blockchain, such as network hashrate, and test if those help explain the returns. For a more in-depth analysis on this topic across a wider range of the crypto market, see [Liu, Tsyvinski, and Wu (2022), "Common Risk Factors in Cryptocurrency," *Journal of Finance*, 77(2): 1133-1177.](https://doi.org/10.1111/jofi.13119)
-
-
-
-
-focuses on analyzing the price history of bitcoin (BTC) across various frequencies (daily, weekly, and monthly) and conducting tests for time series stationarity in each series. As with many financial time series, the price series for bitcoin exhibits significant autocorrelation, which is consistent with a time series being non-stationary. To address this issue, the price series is transformed into a return series, which resolves much of the autocorrelation and is a more appropriate measurement for conducting statistical analysis in asset pricing (e.g. CAPM, FF, etc).
-
-In addition to exploring the concept of autocorrelation and time series stationarity, this project also examines the time series decomposition of the price series and explores some R packages focused on time series analysis. These include the [quantmod package](https://cran.r-project.org/package=quantmod), [xts package](https://cran.r-project.org/package=xts), [tseries package](https://cran.r-project.org/package=tseries), and [seasonal package](https://cran.r-project.org/package=seasonal). With seasonality, there are a few variations to consider. First is day-of-week seasonality, which models any recurring weekly trends. Some other approaches to modeling the seasonality are day-of-year and month-of-year seasonality. Lastly, we'll explore another aspect of seasonality around the four-year halving cycle for Bitcoin. Given that we have only seen a few full halving cycles since bitcoin price data can be reliably measured, these results are still in their infancy in regard to any statistical conclusions.
-
-
-
+This project aims to apply some traditional asset pricing models to the return series of bitcoin (BTC) and some related assets. In addition to the traditional Capital Asset Pricing Model (CAPM), we'll apply the Fama/French three-factor model and the Fama/French five-factor model. Beyond these,  we'll also consider some additional factors that may help explain the returns of bitcoin and other cryptocurrencies, such as the mining hashrate, difficulty, and BTC trading volume. For a more in-depth analysis on this topic across a wider range of the crypto market, see [Liu, Tsyvinski, and Wu (2022), "Common Risk Factors in Cryptocurrency," *Journal of Finance*, 77(2): 1133-1177.](https://doi.org/10.1111/jofi.13119)
 
 ### Other Bitcoin-Related Projects
 

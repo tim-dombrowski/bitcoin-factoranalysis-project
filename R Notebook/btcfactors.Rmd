@@ -19,13 +19,14 @@ renv::restore(clean=TRUE, lockfile="../renv.lock")
 # Load in the packages
 library(quantmod)
 library(tidyverse)
+library(corrplot)
 library(jsonlite)
 library(tseries)
-library(corrplot)
 ```
 
 * The [quantmod package](https://cran.r-project.org/package=quantmod) contains tools for importing and analyzing financial data.
 * The [tidyverse package](https://www.tidyverse.org/) contains a suite of packages for data manipulation and visualization.
+* The [corrplot package](https://cran.r-project.org/package=corrplot) lets us create correlation plots.
 * The [jsonlite package](https://cran.r-project.org/package=jsonlite) lets us more easily import JSON data.
 * The [tseries package](https://cran.r-project.org/package=tseries) contains additional time series analysis functions that we will explore.
 * The [rmarkdown package](https://cran.r-project.org/package=rmarkdown) is used to generate this R Notebook.
@@ -46,14 +47,15 @@ As long as you have downloaded the entire project repository, the renv chunk abo
 
 ```{r setup2, results='hide', message=FALSE, eval=FALSE}
 # Create list of packages needed for this exercise, omit geckor since its not on CRAN
-list.of.packages = c("quantmod","tidyverse","jsonlite","tseries","rmarkdown")
+list.of.packages = c("quantmod","tidyverse","corrplot","jsonlite","tseries","rmarkdown")
 # Check if any have not yet been installed
 new.packages = list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
 # If any need to be installed, install them
 if(length(new.packages)) install.packages(new.packages)
-# Since geckor is no longer published to CRAN, install via GitHub
+# Load in the packages
 library(quantmod)
 library(tidyverse)
+library(corrplot)
 library(jsonlite)
 library(tseries)
 ```
