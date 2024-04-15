@@ -1,7 +1,7 @@
 ---
 title: "Bitcoin Factor Analysis"
 date: "Last updated: `r Sys.Date()`"
-output: html_notebook
+output: github_document
 ---
 
 ## Preliminary Work: Install/Load Packages
