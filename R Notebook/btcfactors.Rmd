@@ -23,6 +23,7 @@ library(tidyverse)
 library(corrplot)
 library(jsonlite)
 library(tseries)
+library(rmarkdown)
 ```
 
 * The [quantmod package](https://cran.r-project.org/package=quantmod) contains tools for importing and analyzing financial data.
@@ -132,7 +133,6 @@ MSTRmonth$AnnRet = diff(log(MSTRmonth$Close))*12*100
 ETHmonth$AnnRet = diff(log(ETHmonth$Close))*12*100
 WBTCmonth$AnnRet = diff(log(WBTCmonth$Close))*12*100
 ```
-
 
 ### Fama/French Factors
 

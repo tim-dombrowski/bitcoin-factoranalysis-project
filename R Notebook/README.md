@@ -1,6 +1,6 @@
 Bitcoin Factor Analysis
 ================
-Last updated: 2024-04-14
+Last updated: 2024-04-18
 
 ## Preliminary Work: Install/Load Packages
 
@@ -36,6 +36,7 @@ library(tidyverse)
 library(corrplot)
 library(jsonlite)
 library(tseries)
+library(rmarkdown)
 ```
 
 - The [quantmod package](https://cran.r-project.org/package=quantmod)
@@ -302,16 +303,16 @@ problems(FF3)
     ## # A tibble: 105 × 5
     ##      row   col expected       actual                           file             
     ##    <int> <int> <chr>          <chr>                            <chr>            
-    ##  1  1174     1 5 columns      1 columns                        C:/Users/timma/S…
-    ##  2  1174     1 date like %Y%m Annual Factors: January-December C:/Users/timma/S…
-    ##  3  1175     2 a double       Mkt-RF                           C:/Users/timma/S…
-    ##  4  1175     3 a double       SMB                              C:/Users/timma/S…
-    ##  5  1175     4 a double       HML                              C:/Users/timma/S…
-    ##  6  1175     5 a double       RF                               C:/Users/timma/S…
-    ##  7  1176     1 date like %Y%m 1927                             C:/Users/timma/S…
-    ##  8  1177     1 date like %Y%m 1928                             C:/Users/timma/S…
-    ##  9  1178     1 date like %Y%m 1929                             C:/Users/timma/S…
-    ## 10  1179     1 date like %Y%m 1930                             C:/Users/timma/S…
+    ##  1  1174     1 5 columns      1 columns                        C:/Users/tdrgv/P…
+    ##  2  1174     1 date like %Y%m Annual Factors: January-December C:/Users/tdrgv/P…
+    ##  3  1175     2 a double       Mkt-RF                           C:/Users/tdrgv/P…
+    ##  4  1175     3 a double       SMB                              C:/Users/tdrgv/P…
+    ##  5  1175     4 a double       HML                              C:/Users/tdrgv/P…
+    ##  6  1175     5 a double       RF                               C:/Users/tdrgv/P…
+    ##  7  1176     1 date like %Y%m 1927                             C:/Users/tdrgv/P…
+    ##  8  1177     1 date like %Y%m 1928                             C:/Users/tdrgv/P…
+    ##  9  1178     1 date like %Y%m 1929                             C:/Users/tdrgv/P…
+    ## 10  1179     1 date like %Y%m 1930                             C:/Users/tdrgv/P…
     ## # ℹ 95 more rows
 
 Note how it refers us to the bottom of the data frame. These are the
@@ -521,7 +522,7 @@ assetsEr |> round(2)
 ```
 
     ##   BTC  GBTC  MSTR   ETH  WBTC 
-    ## 55.53 51.49 46.78 63.52 55.58
+    ## 54.76 49.73 42.60 63.39 54.72
 
 ``` r
 # Asset standard deviations
@@ -530,7 +531,7 @@ assetsSd |> round(2)
 ```
 
     ##    BTC   GBTC   MSTR    ETH   WBTC 
-    ## 236.92 272.91 302.34 291.95 237.85
+    ## 237.62 274.06 307.17 292.08 238.62
 
 ``` r
 # Asset risk-adjusted returns
@@ -538,7 +539,7 @@ assetsSd |> round(2)
 ```
 
     ##    BTC   GBTC   MSTR    ETH   WBTC 
-    ## 0.2344 0.1887 0.1547 0.2176 0.2337
+    ## 0.2304 0.1815 0.1387 0.2170 0.2293
 
 ### Multivariate Statistics
 
@@ -552,11 +553,11 @@ cor(assetreturns) |> round(4)
 ```
 
     ##         BTC   GBTC   MSTR    ETH   WBTC
-    ## BTC  1.0000 0.9592 0.6525 0.7818 0.9986
-    ## GBTC 0.9592 1.0000 0.6547 0.7669 0.9575
-    ## MSTR 0.6525 0.6547 1.0000 0.6189 0.6481
-    ## ETH  0.7818 0.7669 0.6189 1.0000 0.7803
-    ## WBTC 0.9986 0.9575 0.6481 0.7803 1.0000
+    ## BTC  1.0000 0.9603 0.6564 0.7829 0.9986
+    ## GBTC 0.9603 1.0000 0.6579 0.7703 0.9585
+    ## MSTR 0.6564 0.6579 1.0000 0.6236 0.6521
+    ## ETH  0.7829 0.7703 0.6236 1.0000 0.7816
+    ## WBTC 0.9986 0.9585 0.6521 0.7816 1.0000
 
 ``` r
 # Create a correlation plot for the daily returns
@@ -1148,7 +1149,7 @@ adf.test(volumeBTCmonth$avgDailyVolume)
     ##  Augmented Dickey-Fuller Test
     ## 
     ## data:  volumeBTCmonth$avgDailyVolume
-    ## Dickey-Fuller = -2.5396, Lag order = 3, p-value = 0.3563
+    ## Dickey-Fuller = -2.5297, Lag order = 3, p-value = 0.3603
     ## alternative hypothesis: stationary
 
 ``` r
@@ -1159,7 +1160,7 @@ adf.test(volumeBTCmonth$VolGrowthBTC[-1])
     ##  Augmented Dickey-Fuller Test
     ## 
     ## data:  volumeBTCmonth$VolGrowthBTC[-1]
-    ## Dickey-Fuller = -4.0091, Lag order = 3, p-value = 0.01505
+    ## Dickey-Fuller = -3.9695, Lag order = 3, p-value = 0.01679
     ## alternative hypothesis: stationary
 
 ``` r
@@ -1171,7 +1172,7 @@ adf.test(volumeGBTCmonth$avgDailyVolume)
     ##  Augmented Dickey-Fuller Test
     ## 
     ## data:  volumeGBTCmonth$avgDailyVolume
-    ## Dickey-Fuller = -2.1023, Lag order = 3, p-value = 0.5335
+    ## Dickey-Fuller = -2.0932, Lag order = 3, p-value = 0.5372
     ## alternative hypothesis: stationary
 
 ``` r
@@ -1185,7 +1186,7 @@ adf.test(volumeGBTCmonth$VolGrowthGBTC[-1])
     ##  Augmented Dickey-Fuller Test
     ## 
     ## data:  volumeGBTCmonth$VolGrowthGBTC[-1]
-    ## Dickey-Fuller = -5.0805, Lag order = 3, p-value = 0.01
+    ## Dickey-Fuller = -5.0733, Lag order = 3, p-value = 0.01
     ## alternative hypothesis: stationary
 
 ``` r
@@ -1197,7 +1198,7 @@ adf.test(volumeMSTRmonth$avgDailyVolume)
     ##  Augmented Dickey-Fuller Test
     ## 
     ## data:  volumeMSTRmonth$avgDailyVolume
-    ## Dickey-Fuller = -1.6894, Lag order = 3, p-value = 0.7008
+    ## Dickey-Fuller = -1.6978, Lag order = 3, p-value = 0.6974
     ## alternative hypothesis: stationary
 
 ``` r
@@ -1211,7 +1212,7 @@ adf.test(volumeMSTRmonth$VolGrowthMSTR[-1])
     ##  Augmented Dickey-Fuller Test
     ## 
     ## data:  volumeMSTRmonth$VolGrowthMSTR[-1]
-    ## Dickey-Fuller = -4.4017, Lag order = 3, p-value = 0.01
+    ## Dickey-Fuller = -4.4028, Lag order = 3, p-value = 0.01
     ## alternative hypothesis: stationary
 
 ``` r
@@ -1223,7 +1224,7 @@ adf.test(volumeETHmonth$avgDailyVolume)
     ##  Augmented Dickey-Fuller Test
     ## 
     ## data:  volumeETHmonth$avgDailyVolume
-    ## Dickey-Fuller = -1.9727, Lag order = 3, p-value = 0.586
+    ## Dickey-Fuller = -1.9681, Lag order = 3, p-value = 0.5879
     ## alternative hypothesis: stationary
 
 ``` r
@@ -1234,7 +1235,7 @@ adf.test(volumeETHmonth$VolGrowthETH[-1])
     ##  Augmented Dickey-Fuller Test
     ## 
     ## data:  volumeETHmonth$VolGrowthETH[-1]
-    ## Dickey-Fuller = -4.0382, Lag order = 3, p-value = 0.01376
+    ## Dickey-Fuller = -4.0102, Lag order = 3, p-value = 0.015
     ## alternative hypothesis: stationary
 
 ``` r
@@ -1246,7 +1247,7 @@ adf.test(volumeWBTCmonth$avgDailyVolume)
     ##  Augmented Dickey-Fuller Test
     ## 
     ## data:  volumeWBTCmonth$avgDailyVolume
-    ## Dickey-Fuller = -1.7225, Lag order = 3, p-value = 0.6874
+    ## Dickey-Fuller = -1.7257, Lag order = 3, p-value = 0.6861
     ## alternative hypothesis: stationary
 
 ``` r
@@ -1257,7 +1258,7 @@ adf.test(volumeWBTCmonth$VolGrowthWBTC[-1])
     ##  Augmented Dickey-Fuller Test
     ## 
     ## data:  volumeWBTCmonth$VolGrowthWBTC[-1]
-    ## Dickey-Fuller = -3.0935, Lag order = 3, p-value = 0.1321
+    ## Dickey-Fuller = -3.08, Lag order = 3, p-value = 0.1376
     ## alternative hypothesis: stationary
 
 Now let’s merge the volume growth data to the asset returns and FF5
