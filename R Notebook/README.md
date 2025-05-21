@@ -1,6 +1,6 @@
 Bitcoin Factor Analysis
 ================
-Last updated: 2024-04-18
+Last updated: 2025-05-21
 
 ## Preliminary Work: Install/Load Packages
 
@@ -33,6 +33,7 @@ renv::restore(clean=TRUE, lockfile="../renv.lock")
 # Load in the packages
 library(quantmod)
 library(tidyverse)
+library(scales)
 library(corrplot)
 library(jsonlite)
 library(tseries)
@@ -100,7 +101,7 @@ should take care of installing the packages for you.
 
 ``` r
 # Create list of packages needed for this exercise, omit geckor since its not on CRAN
-list.of.packages = c("quantmod","tidyverse","corrplot","jsonlite","tseries","rmarkdown")
+list.of.packages = c("quantmod","tidyverse","scales","corrplot","jsonlite","tseries","rmarkdown")
 # Check if any have not yet been installed
 new.packages = list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
 # If any need to be installed, install them
@@ -108,6 +109,7 @@ if(length(new.packages)) install.packages(new.packages)
 # Load in the packages
 library(quantmod)
 library(tidyverse)
+library(scales)
 library(corrplot)
 library(jsonlite)
 library(tseries)
@@ -152,21 +154,6 @@ getSymbols(tickers,
            src="yahoo",
            from=startdate,
            to=Sys.Date())
-```
-
-    ## Warning: BTC-USD contains missing values. Some functions will not work if
-    ## objects contain missing values in the middle of the series. Consider using
-    ## na.omit(), na.approx(), na.fill(), etc to remove or replace them.
-
-    ## Warning: ETH-USD contains missing values. Some functions will not work if
-    ## objects contain missing values in the middle of the series. Consider using
-    ## na.omit(), na.approx(), na.fill(), etc to remove or replace them.
-
-    ## Warning: WBTC-USD contains missing values. Some functions will not work if
-    ## objects contain missing values in the middle of the series. Consider using
-    ## na.omit(), na.approx(), na.fill(), etc to remove or replace them.
-
-``` r
 BTC = `BTC-USD`
 ETH = `ETH-USD`
 WBTC = `WBTC-USD`
@@ -187,12 +174,6 @@ BTCdaily = BTC$`BTC-USD.Close`
 names(BTCdaily) = "Close"
 # Convert to monthly series
 BTCmonthOHLC = to.monthly(BTCdaily$Close, name=NULL)
-```
-
-    ## Warning in to.period(x, "months", indexAt = indexAt, name = name, ...): missing
-    ## values removed from data
-
-``` r
 BTCmonth = BTCmonthOHLC$Close
 # Same for GBTC
 GBTCdaily = GBTC$GBTC.Close
@@ -208,23 +189,11 @@ MSTRmonth = MSTRmonthOHLC$Close
 ETHdaily = ETH$`ETH-USD.Close` 
 names(ETHdaily) = "Close"
 ETHmonthOHLC = to.monthly(ETHdaily$Close, name=NULL)
-```
-
-    ## Warning in to.period(x, "months", indexAt = indexAt, name = name, ...): missing
-    ## values removed from data
-
-``` r
 ETHmonth = ETHmonthOHLC$Close
 # Same for WBTC
 WBTCdaily = WBTC$`WBTC-USD.Close` 
 names(WBTCdaily) = "Close"
 WBTCmonthOHLC = to.monthly(WBTCdaily$Close, name=NULL)
-```
-
-    ## Warning in to.period(x, "months", indexAt = indexAt, name = name, ...): missing
-    ## values removed from data
-
-``` r
 WBTCmonth = WBTCmonthOHLC$Close
 ```
 
@@ -300,20 +269,20 @@ let’s investigate with `problems()`.
 problems(FF3)
 ```
 
-    ## # A tibble: 105 × 5
+    ## # A tibble: 106 × 5
     ##      row   col expected       actual                           file             
     ##    <int> <int> <chr>          <chr>                            <chr>            
-    ##  1  1174     1 5 columns      1 columns                        C:/Users/tdrgv/P…
-    ##  2  1174     1 date like %Y%m Annual Factors: January-December C:/Users/tdrgv/P…
-    ##  3  1175     2 a double       Mkt-RF                           C:/Users/tdrgv/P…
-    ##  4  1175     3 a double       SMB                              C:/Users/tdrgv/P…
-    ##  5  1175     4 a double       HML                              C:/Users/tdrgv/P…
-    ##  6  1175     5 a double       RF                               C:/Users/tdrgv/P…
-    ##  7  1176     1 date like %Y%m 1927                             C:/Users/tdrgv/P…
-    ##  8  1177     1 date like %Y%m 1928                             C:/Users/tdrgv/P…
-    ##  9  1178     1 date like %Y%m 1929                             C:/Users/tdrgv/P…
-    ## 10  1179     1 date like %Y%m 1930                             C:/Users/tdrgv/P…
-    ## # ℹ 95 more rows
+    ##  1  1184     1 5 columns      1 columns                        C:/Users/timma/P…
+    ##  2  1184     1 date like %Y%m Annual Factors: January-December C:/Users/timma/P…
+    ##  3  1185     2 a double       Mkt-RF                           C:/Users/timma/P…
+    ##  4  1185     3 a double       SMB                              C:/Users/timma/P…
+    ##  5  1185     4 a double       HML                              C:/Users/timma/P…
+    ##  6  1185     5 a double       RF                               C:/Users/timma/P…
+    ##  7  1186     1 date like %Y%m 1927                             C:/Users/timma/P…
+    ##  8  1187     1 date like %Y%m 1928                             C:/Users/timma/P…
+    ##  9  1188     1 date like %Y%m 1929                             C:/Users/timma/P…
+    ## 10  1189     1 date like %Y%m 1930                             C:/Users/timma/P…
+    ## # ℹ 96 more rows
 
 Note how it refers us to the bottom of the data frame. These are the
 annual observations that are included below the monthly data. Since
@@ -424,68 +393,72 @@ we’ll use line plots. For returns, we’ll use bar plots.
 
 ``` r
 # Plot the asset prices
-ggplot(data=assetprices, aes(x=index(assetprices), y=BTC)) + geom_line() + xlab("")
+ggplot(data=assetprices, aes(x=index(assetprices), y=BTC)) + geom_line() + xlab("") + 
+  scale_y_continuous(labels = dollar_format()) + ggtitle("Bitcoin (BTC) Price")
 ```
-
-    ## Warning: The `trans` argument of `continuous_scale()` is deprecated as of ggplot2 3.5.0.
-    ## ℹ Please use the `transform` argument instead.
-    ## This warning is displayed once every 8 hours.
-    ## Call `lifecycle::last_lifecycle_warnings()` to see where this warning was
-    ## generated.
 
 ![](README_files/figure-gfm/tsplots-1.png)<!-- -->
 
 ``` r
-ggplot(data=assetprices, aes(x=index(assetprices), y=GBTC)) + geom_line() + xlab("")
+ggplot(data=assetprices, aes(x=index(assetprices), y=GBTC)) + geom_line() + xlab("") + 
+  scale_y_continuous(labels = dollar_format()) + ggtitle("Grayscale Bitcoin Fund/ETF (GBTC) Price")
 ```
 
 ![](README_files/figure-gfm/tsplots-2.png)<!-- -->
 
 ``` r
-ggplot(data=assetprices, aes(x=index(assetprices), y=MSTR)) + geom_line() + xlab("")
+ggplot(data=assetprices, aes(x=index(assetprices), y=MSTR)) + geom_line() + xlab("") + 
+  scale_y_continuous(labels = dollar_format()) + ggtitle("Strategy (MSTR) Price")
 ```
 
 ![](README_files/figure-gfm/tsplots-3.png)<!-- -->
 
 ``` r
-ggplot(data=assetprices, aes(x=index(assetprices), y=ETH)) + geom_line() + xlab("")
+ggplot(data=assetprices, aes(x=index(assetprices), y=ETH)) + geom_line() + xlab("") + 
+  scale_y_continuous(labels = dollar_format()) + ggtitle("Ethereum (ETH) Price")
 ```
 
 ![](README_files/figure-gfm/tsplots-4.png)<!-- -->
 
 ``` r
-ggplot(data=assetprices, aes(x=index(assetprices), y=WBTC)) + geom_line() + xlab("")
+ggplot(data=assetprices, aes(x=index(assetprices), y=WBTC)) + geom_line() + xlab("") + 
+  scale_y_continuous(labels = dollar_format()) + ggtitle("Wrapped Bitcoin (WBTC) Price")
 ```
 
 ![](README_files/figure-gfm/tsplots-5.png)<!-- -->
 
 ``` r
 # Plot the asset returns
-ggplot(data=assetreturns, aes(x=index(assetreturns), y=BTC)) + geom_col() + xlab("")
+ggplot(data=assetreturns, aes(x=index(assetreturns), y=BTC)) + geom_col() + xlab("") + 
+  scale_y_continuous(labels = percent_format(scale=1)) + ggtitle("Bitcoin (BTC) Returns")
 ```
 
 ![](README_files/figure-gfm/tsplots-6.png)<!-- -->
 
 ``` r
-ggplot(data=assetreturns, aes(x=index(assetreturns), y=GBTC)) + geom_col() + xlab("")
+ggplot(data=assetreturns, aes(x=index(assetreturns), y=GBTC)) + geom_col() + xlab("") + 
+  scale_y_continuous(labels = percent_format(scale=1)) + ggtitle("Grayscale Bitcoin Fund/ETF (GBTC) Returns")
 ```
 
 ![](README_files/figure-gfm/tsplots-7.png)<!-- -->
 
 ``` r
-ggplot(data=assetreturns, aes(x=index(assetreturns), y=MSTR)) + geom_col() + xlab("")
+ggplot(data=assetreturns, aes(x=index(assetreturns), y=MSTR)) + geom_col() + xlab("") + 
+  scale_y_continuous(labels = percent_format(scale=1)) + ggtitle("Strategy (MSTR) Returns")
 ```
 
 ![](README_files/figure-gfm/tsplots-8.png)<!-- -->
 
 ``` r
-ggplot(data=assetreturns, aes(x=index(assetreturns), y=ETH)) + geom_col() + xlab("")
+ggplot(data=assetreturns, aes(x=index(assetreturns), y=ETH)) + geom_col() + xlab("") + 
+  scale_y_continuous(labels = percent_format(scale=1)) + ggtitle("Ethereum (ETH) Returns")
 ```
 
 ![](README_files/figure-gfm/tsplots-9.png)<!-- -->
 
 ``` r
-ggplot(data=assetreturns, aes(x=index(assetreturns), y=WBTC)) + geom_col() + xlab("")
+ggplot(data=assetreturns, aes(x=index(assetreturns), y=WBTC)) + geom_col() + xlab("") + 
+  scale_y_continuous(labels = percent_format(scale=1)) + ggtitle("Wrapped Bitcoin (WBTC) Returns")
 ```
 
 ![](README_files/figure-gfm/tsplots-10.png)<!-- -->
@@ -504,7 +477,13 @@ assetreturnsdf = assetreturnsdf |> pivot_longer(cols=-Date, names_to="Asset", va
 # Plot the density of returns
 ggplot(data=assetreturnsdf, aes(x=Return, fill=Asset)) + 
   geom_density(alpha=0.5) + 
-  facet_wrap(~Asset)
+  facet_wrap(~Asset) +
+  scale_x_continuous(labels=percent_format(scale=1)) +
+  xlab("Annualized Return") +
+  scale_y_continuous(labels=percent_format()) +
+  ylab("Density") +
+  ggtitle("Density of Annualized Returns") +
+  theme(legend.position="none")
 ```
 
 ![](README_files/figure-gfm/densityplots-1.png)<!-- -->
@@ -522,7 +501,7 @@ assetsEr |> round(2)
 ```
 
     ##   BTC  GBTC  MSTR   ETH  WBTC 
-    ## 54.76 49.73 42.60 63.39 54.72
+    ## 54.44 48.20 55.14 49.86 54.33
 
 ``` r
 # Asset standard deviations
@@ -531,7 +510,7 @@ assetsSd |> round(2)
 ```
 
     ##    BTC   GBTC   MSTR    ETH   WBTC 
-    ## 237.62 274.06 307.17 292.08 238.62
+    ## 225.02 258.33 308.68 287.66 225.87
 
 ``` r
 # Asset risk-adjusted returns
@@ -539,7 +518,7 @@ assetsSd |> round(2)
 ```
 
     ##    BTC   GBTC   MSTR    ETH   WBTC 
-    ## 0.2304 0.1815 0.1387 0.2170 0.2293
+    ## 0.2419 0.1866 0.1786 0.1733 0.2405
 
 ### Multivariate Statistics
 
@@ -553,11 +532,11 @@ cor(assetreturns) |> round(4)
 ```
 
     ##         BTC   GBTC   MSTR    ETH   WBTC
-    ## BTC  1.0000 0.9603 0.6564 0.7829 0.9986
-    ## GBTC 0.9603 1.0000 0.6579 0.7703 0.9585
-    ## MSTR 0.6564 0.6579 1.0000 0.6236 0.6521
-    ## ETH  0.7829 0.7703 0.6236 1.0000 0.7816
-    ## WBTC 0.9986 0.9585 0.6521 0.7816 1.0000
+    ## BTC  1.0000 0.9623 0.6692 0.7863 0.9987
+    ## GBTC 0.9623 1.0000 0.6677 0.7723 0.9606
+    ## MSTR 0.6692 0.6677 1.0000 0.6139 0.6655
+    ## ETH  0.7863 0.7723 0.6139 1.0000 0.7846
+    ## WBTC 0.9987 0.9606 0.6655 0.7846 1.0000
 
 ``` r
 # Create a correlation plot for the daily returns
@@ -599,15 +578,15 @@ cor(assets_ff3[,-c(1:5)]) |> round(2)
 ```
 
     ##        MktRF   SMB   HML    RF BTCxs GBTCxs MSTRxs ETHxs WBTCxs
-    ## MktRF   1.00  0.31  0.05 -0.02  0.48   0.49   0.57  0.55   0.47
-    ## SMB     0.31  1.00  0.07 -0.15  0.22   0.19   0.48  0.29   0.21
-    ## HML     0.05  0.07  1.00 -0.13 -0.07  -0.10  -0.16 -0.02  -0.07
-    ## RF     -0.02 -0.15 -0.13  1.00  0.06   0.15   0.10 -0.07   0.06
-    ## BTCxs   0.48  0.22 -0.07  0.06  1.00   0.96   0.65  0.78   1.00
-    ## GBTCxs  0.49  0.19 -0.10  0.15  0.96   1.00   0.66  0.77   0.96
-    ## MSTRxs  0.57  0.48 -0.16  0.10  0.65   0.66   1.00  0.63   0.65
-    ## ETHxs   0.55  0.29 -0.02 -0.07  0.78   0.77   0.63  1.00   0.78
-    ## WBTCxs  0.47  0.21 -0.07  0.06  1.00   0.96   0.65  0.78   1.00
+    ## MktRF   1.00  0.31  0.06 -0.02  0.49   0.50   0.57  0.56   0.49
+    ## SMB     0.31  1.00  0.11 -0.12  0.25   0.22   0.47  0.32   0.25
+    ## HML     0.06  0.11  1.00 -0.11 -0.04  -0.08  -0.09 -0.01  -0.04
+    ## RF     -0.02 -0.12 -0.11  1.00  0.03   0.10   0.12 -0.11   0.03
+    ## BTCxs   0.49  0.25 -0.04  0.03  1.00   0.96   0.66  0.79   1.00
+    ## GBTCxs  0.50  0.22 -0.08  0.10  0.96   1.00   0.66  0.78   0.96
+    ## MSTRxs  0.57  0.47 -0.09  0.12  0.66   0.66   1.00  0.63   0.66
+    ## ETHxs   0.56  0.32 -0.01 -0.11  0.79   0.78   0.63  1.00   0.79
+    ## WBTCxs  0.49  0.25 -0.04  0.03  1.00   0.96   0.66  0.79   1.00
 
 ``` r
 corrplot(cor(assets_ff3[,-c(1:5)]), method="color")
@@ -632,19 +611,19 @@ summary(CAPMreg_BTC)
     ## lm(formula = BTCxs ~ MktRF, data = assets_ff3)
     ## 
     ## Residuals:
-    ##    Min     1Q Median     3Q    Max 
-    ## -560.8 -130.5  -29.3  128.4  676.7 
+    ##     Min      1Q  Median      3Q     Max 
+    ## -558.58 -128.10  -13.35  126.02  684.65 
     ## 
     ## Coefficients:
     ##             Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)  31.2609    27.7030   1.128 0.263706    
-    ## MktRF         1.7368     0.4177   4.158 0.000105 ***
+    ## (Intercept)  28.8045    24.4586   1.178    0.243    
+    ## MktRF         1.8024     0.3859   4.670 1.44e-05 ***
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 211.9 on 59 degrees of freedom
-    ## Multiple R-squared:  0.2266, Adjusted R-squared:  0.2135 
-    ## F-statistic: 17.29 on 1 and 59 DF,  p-value: 0.0001054
+    ## Residual standard error: 201.3 on 69 degrees of freedom
+    ## Multiple R-squared:  0.2402, Adjusted R-squared:  0.2292 
+    ## F-statistic: 21.81 on 1 and 69 DF,  p-value: 1.437e-05
 
 ``` r
 # GBTC CAPM regression
@@ -658,18 +637,18 @@ summary(CAPMreg_GBTC)
     ## 
     ## Residuals:
     ##     Min      1Q  Median      3Q     Max 
-    ## -555.22 -147.29    5.79  159.72  766.60 
+    ## -551.45 -142.13   10.26  137.42  775.38 
     ## 
     ## Coefficients:
     ##             Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)   21.841     31.701   0.689    0.494    
-    ## MktRF          2.080      0.478   4.352 5.43e-05 ***
+    ## (Intercept)  17.8692    27.9378    0.64    0.525    
+    ## MktRF         2.1381     0.4408    4.85 7.34e-06 ***
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 242.4 on 59 degrees of freedom
-    ## Multiple R-squared:  0.243,  Adjusted R-squared:  0.2302 
-    ## F-statistic: 18.94 on 1 and 59 DF,  p-value: 5.427e-05
+    ## Residual standard error: 229.9 on 69 degrees of freedom
+    ## Multiple R-squared:  0.2543, Adjusted R-squared:  0.2435 
+    ## F-statistic: 23.53 on 1 and 69 DF,  p-value: 7.344e-06
 
 ``` r
 # MSTR CAPM regression
@@ -683,18 +662,18 @@ summary(CAPMreg_MSTR)
     ## 
     ## Residuals:
     ##     Min      1Q  Median      3Q     Max 
-    ## -511.92 -142.33   -9.15  122.98  688.64 
+    ## -533.96 -170.43  -20.33  147.30  665.16 
     ## 
     ## Coefficients:
     ##             Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)   4.0883    32.0481   0.128    0.899    
-    ## MktRF         2.6056     0.4832   5.392 1.28e-06 ***
+    ## (Intercept)  11.4557    31.5675   0.363    0.718    
+    ## MktRF         2.8652     0.4981   5.753 2.21e-07 ***
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 245.1 on 59 degrees of freedom
-    ## Multiple R-squared:  0.3301, Adjusted R-squared:  0.3188 
-    ## F-statistic: 29.08 on 1 and 59 DF,  p-value: 1.284e-06
+    ## Residual standard error: 259.8 on 69 degrees of freedom
+    ## Multiple R-squared:  0.3241, Adjusted R-squared:  0.3143 
+    ## F-statistic: 33.09 on 1 and 69 DF,  p-value: 2.207e-07
 
 ``` r
 # Ethereum CAPM regression
@@ -707,19 +686,19 @@ summary(CAPMreg_ETH)
     ## lm(formula = ETHxs ~ MktRF, data = assets_ff3)
     ## 
     ## Residuals:
-    ##     Min      1Q  Median      3Q     Max 
-    ## -501.50 -143.32  -17.76  134.36  774.33 
+    ##    Min     1Q Median     3Q    Max 
+    ## -480.1 -136.8  -15.8  124.5  793.8 
     ## 
     ## Coefficients:
     ##             Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)  32.5004    32.4091   1.003     0.32    
-    ## MktRF         2.4736     0.4887   5.062 4.35e-06 ***
+    ## (Intercept)  20.7771    29.0020   0.716    0.476    
+    ## MktRF         2.5663     0.4576   5.608 3.92e-07 ***
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 247.8 on 59 degrees of freedom
-    ## Multiple R-squared:  0.3028, Adjusted R-squared:  0.291 
-    ## F-statistic: 25.62 on 1 and 59 DF,  p-value: 4.347e-06
+    ## Residual standard error: 238.6 on 69 degrees of freedom
+    ## Multiple R-squared:  0.3131, Adjusted R-squared:  0.3031 
+    ## F-statistic: 31.45 on 1 and 69 DF,  p-value: 3.922e-07
 
 ``` r
 # Wrapped Bitcoin CAPM regression
@@ -733,18 +712,18 @@ summary(CAPMreg_WBTC)
     ## 
     ## Residuals:
     ##     Min      1Q  Median      3Q     Max 
-    ## -561.59 -126.83  -28.51  138.14  689.52 
+    ## -559.33 -124.11  -13.54  130.96  697.31 
     ## 
     ## Coefficients:
     ##             Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)  31.2274    27.8600   1.121 0.266886    
-    ## MktRF         1.7381     0.4201   4.138 0.000113 ***
+    ## (Intercept)   28.747     24.588   1.169    0.246    
+    ## MktRF          1.802      0.388   4.644 1.58e-05 ***
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 213.1 on 59 degrees of freedom
-    ## Multiple R-squared:  0.2249, Adjusted R-squared:  0.2118 
-    ## F-statistic: 17.12 on 1 and 59 DF,  p-value: 0.0001129
+    ## Residual standard error: 202.3 on 69 degrees of freedom
+    ## Multiple R-squared:  0.2382, Adjusted R-squared:  0.2271 
+    ## F-statistic: 21.57 on 1 and 69 DF,  p-value: 1.581e-05
 
 #### Fama/French 3-Factor Models
 
@@ -761,21 +740,21 @@ summary(FF3reg_BTC)
     ## lm(formula = BTCxs ~ MktRF + SMB + HML, data = assets_ff3)
     ## 
     ## Residuals:
-    ##    Min     1Q Median     3Q    Max 
-    ## -526.0 -138.0  -17.6  119.2  666.1 
+    ##     Min      1Q  Median      3Q     Max 
+    ## -528.65 -124.16  -10.25  124.10  673.59 
     ## 
     ## Coefficients:
     ##             Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)  32.9405    28.1627   1.170 0.247011    
-    ## MktRF         1.6593     0.4432   3.744 0.000423 ***
-    ## SMB           0.5691     0.8243   0.690 0.492690    
-    ## HML          -0.4060     0.4903  -0.828 0.411116    
+    ## (Intercept)  31.7563    24.7893   1.281 0.204594    
+    ## MktRF         1.6837     0.4080   4.127 0.000104 ***
+    ## SMB           0.7484     0.7120   1.051 0.297008    
+    ## HML          -0.3512     0.4512  -0.778 0.439085    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 213.5 on 57 degrees of freedom
-    ## Multiple R-squared:  0.2413, Adjusted R-squared:  0.2013 
-    ## F-statistic: 6.042 on 3 and 57 DF,  p-value: 0.001205
+    ## Residual standard error: 201.9 on 67 degrees of freedom
+    ## Multiple R-squared:  0.2575, Adjusted R-squared:  0.2242 
+    ## F-statistic: 7.744 on 3 and 67 DF,  p-value: 0.0001626
 
 ``` r
 # GBTC FF3 regression
@@ -789,20 +768,20 @@ summary(FF3reg_GBTC)
     ## 
     ## Residuals:
     ##     Min      1Q  Median      3Q     Max 
-    ## -510.73 -165.46   -4.15  154.82  751.11 
+    ## -509.21 -139.35    4.29  148.01  759.75 
     ## 
     ## Coefficients:
     ##             Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)  22.2441    32.1382   0.692 0.491660    
-    ## MktRF         2.0436     0.5057   4.041 0.000161 ***
-    ## SMB           0.3876     0.9406   0.412 0.681806    
-    ## HML          -0.6387     0.5595  -1.142 0.258423    
+    ## (Intercept)  19.5831    28.2915   0.692    0.491    
+    ## MktRF         2.0587     0.4656   4.421 3.69e-05 ***
+    ## SMB           0.5951     0.8126   0.732    0.467    
+    ## HML          -0.5856     0.5149  -1.137    0.260    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 243.6 on 57 degrees of freedom
-    ## Multiple R-squared:  0.2615, Adjusted R-squared:  0.2226 
-    ## F-statistic: 6.727 on 3 and 57 DF,  p-value: 0.0005781
+    ## Residual standard error: 230.4 on 67 degrees of freedom
+    ## Multiple R-squared:  0.2725, Adjusted R-squared:  0.2399 
+    ## F-statistic: 8.365 on 3 and 67 DF,  p-value: 8.418e-05
 
 ``` r
 # MSTR FF3 regression
@@ -816,20 +795,20 @@ summary(FF3reg_MSTR)
     ## 
     ## Residuals:
     ##     Min      1Q  Median      3Q     Max 
-    ## -520.77 -126.04   -3.91  126.88  667.26 
+    ## -500.41 -164.60  -10.53  135.51  653.05 
     ## 
     ## Coefficients:
     ##             Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)  14.6957    29.1546   0.504  0.61616    
-    ## MktRF         2.1655     0.4588   4.720 1.57e-05 ***
-    ## SMB           2.9149     0.8533   3.416  0.00118 ** 
-    ## HML          -1.0988     0.5075  -2.165  0.03459 *  
+    ## (Intercept)  24.2813    29.4044   0.826 0.411863    
+    ## MktRF         2.3673     0.4840   4.891 6.58e-06 ***
+    ## SMB           2.9827     0.8446   3.532 0.000753 ***
+    ## HML          -0.8866     0.5352  -1.657 0.102261    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 221 on 57 degrees of freedom
-    ## Multiple R-squared:  0.4737, Adjusted R-squared:  0.446 
-    ## F-statistic:  17.1 on 3 and 57 DF,  p-value: 4.848e-08
+    ## Residual standard error: 239.5 on 67 degrees of freedom
+    ## Multiple R-squared:  0.4421, Adjusted R-squared:  0.4171 
+    ## F-statistic:  17.7 on 3 and 67 DF,  p-value: 1.444e-08
 
 ``` r
 # Ethereum FF3 Regression
@@ -843,20 +822,20 @@ summary(FF3reg_ETH)
     ## 
     ## Residuals:
     ##     Min      1Q  Median      3Q     Max 
-    ## -571.53 -133.64    7.76  106.75  765.07 
+    ## -565.20 -130.33   13.54  108.52  781.18 
     ## 
     ## Coefficients:
     ##             Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)  36.7973    32.8309   1.121    0.267    
-    ## MktRF         2.3007     0.5166   4.453    4e-05 ***
-    ## SMB           1.1062     0.9609   1.151    0.254    
-    ## HML          -0.2843     0.5715  -0.497    0.621    
+    ## (Intercept)  26.5292    29.1732   0.909    0.366    
+    ## MktRF         2.3453     0.4802   4.884 6.76e-06 ***
+    ## SMB           1.3021     0.8379   1.554    0.125    
+    ## HML          -0.3130     0.5310  -0.590    0.557    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 248.9 on 57 degrees of freedom
-    ## Multiple R-squared:  0.3208, Adjusted R-squared:  0.2851 
-    ## F-statistic: 8.974 on 3 and 57 DF,  p-value: 5.826e-05
+    ## Residual standard error: 237.6 on 67 degrees of freedom
+    ## Multiple R-squared:  0.3388, Adjusted R-squared:  0.3092 
+    ## F-statistic: 11.44 on 3 and 67 DF,  p-value: 3.787e-06
 
 ``` r
 # Wrapped Bitcoin FF3 Regression
@@ -870,20 +849,20 @@ summary(FF3reg_WBTC)
     ## 
     ## Residuals:
     ##     Min      1Q  Median      3Q     Max 
-    ## -526.60 -137.44  -22.74  135.25  678.95 
+    ## -529.30 -114.86  -10.35  125.89  686.39 
     ## 
     ## Coefficients:
     ##             Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)  32.6876    28.3424   1.153 0.253596    
-    ## MktRF         1.6690     0.4460   3.742 0.000426 ***
-    ## SMB           0.5200     0.8295   0.627 0.533228    
-    ## HML          -0.4073     0.4934  -0.825 0.412536    
+    ## (Intercept)  31.5199    24.9410   1.264 0.210690    
+    ## MktRF         1.6898     0.4105   4.116 0.000108 ***
+    ## SMB           0.7123     0.7164   0.994 0.323664    
+    ## HML          -0.3519     0.4539  -0.775 0.440898    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 214.9 on 57 degrees of freedom
-    ## Multiple R-squared:  0.2385, Adjusted R-squared:  0.1984 
-    ## F-statistic: 5.951 on 3 and 57 DF,  p-value: 0.001329
+    ## Residual standard error: 203.1 on 67 degrees of freedom
+    ## Multiple R-squared:  0.2543, Adjusted R-squared:  0.2209 
+    ## F-statistic: 7.615 on 3 and 67 DF,  p-value: 0.0001867
 
 ### Fama/French 5-Factor Models
 
@@ -913,17 +892,17 @@ cor(assets_ff5[,-c(1:5)]) |> round(2)
 ```
 
     ##        MktRF   SMB   HML   RMW   CMA    RF BTCxs GBTCxs MSTRxs ETHxs WBTCxs
-    ## MktRF   1.00  0.34  0.05  0.08 -0.20 -0.02  0.48   0.49   0.57  0.55   0.47
-    ## SMB     0.34  1.00  0.36 -0.38  0.03 -0.17  0.20   0.16   0.41  0.26   0.20
-    ## HML     0.05  0.36  1.00  0.19  0.66 -0.13 -0.07  -0.10  -0.16 -0.02  -0.07
-    ## RMW     0.08 -0.38  0.19  1.00  0.18 -0.10 -0.14  -0.13  -0.35 -0.08  -0.15
-    ## CMA    -0.20  0.03  0.66  0.18  1.00 -0.21 -0.23  -0.26  -0.28 -0.17  -0.22
-    ## RF     -0.02 -0.17 -0.13 -0.10 -0.21  1.00  0.06   0.15   0.10 -0.07   0.06
-    ## BTCxs   0.48  0.20 -0.07 -0.14 -0.23  0.06  1.00   0.96   0.65  0.78   1.00
-    ## GBTCxs  0.49  0.16 -0.10 -0.13 -0.26  0.15  0.96   1.00   0.66  0.77   0.96
-    ## MSTRxs  0.57  0.41 -0.16 -0.35 -0.28  0.10  0.65   0.66   1.00  0.63   0.65
-    ## ETHxs   0.55  0.26 -0.02 -0.08 -0.17 -0.07  0.78   0.77   0.63  1.00   0.78
-    ## WBTCxs  0.47  0.20 -0.07 -0.15 -0.22  0.06  1.00   0.96   0.65  0.78   1.00
+    ## MktRF   1.00  0.34  0.06  0.06 -0.21 -0.02  0.49   0.50   0.57  0.56   0.49
+    ## SMB     0.34  1.00  0.39 -0.38  0.02 -0.13  0.24   0.20   0.42  0.29   0.24
+    ## HML     0.06  0.39  1.00  0.17  0.65 -0.11 -0.04  -0.08  -0.09 -0.01  -0.04
+    ## RMW     0.06 -0.38  0.17  1.00  0.16 -0.08 -0.16  -0.14  -0.34 -0.10  -0.17
+    ## CMA    -0.21  0.02  0.65  0.16  1.00 -0.21 -0.23  -0.26  -0.25 -0.18  -0.22
+    ## RF     -0.02 -0.13 -0.11 -0.08 -0.21  1.00  0.03   0.10   0.12 -0.11   0.03
+    ## BTCxs   0.49  0.24 -0.04 -0.16 -0.23  0.03  1.00   0.96   0.66  0.79   1.00
+    ## GBTCxs  0.50  0.20 -0.08 -0.14 -0.26  0.10  0.96   1.00   0.66  0.78   0.96
+    ## MSTRxs  0.57  0.42 -0.09 -0.34 -0.25  0.12  0.66   0.66   1.00  0.63   0.66
+    ## ETHxs   0.56  0.29 -0.01 -0.10 -0.18 -0.11  0.79   0.78   0.63  1.00   0.79
+    ## WBTCxs  0.49  0.24 -0.04 -0.17 -0.22  0.03  1.00   0.96   0.66  0.79   1.00
 
 ``` r
 corrplot(cor(assets_ff5[,-c(1:5)]), method="color")
@@ -945,22 +924,22 @@ summary(FF5reg_BTC)
     ## 
     ## Residuals:
     ##     Min      1Q  Median      3Q     Max 
-    ## -511.22 -118.27  -17.83  119.43  677.16 
+    ## -514.26 -121.28    7.76  106.44  683.37 
     ## 
     ## Coefficients:
     ##             Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)  41.8481    28.7661   1.455 0.151416    
-    ## MktRF         1.7243     0.4789   3.601 0.000682 ***
-    ## SMB          -0.2021     1.0041  -0.201 0.841199    
-    ## HML           0.1674     0.7772   0.215 0.830264    
-    ## RMW          -1.3442     1.0899  -1.233 0.222687    
-    ## CMA          -0.8743     1.1105  -0.787 0.434487    
+    ## (Intercept) 39.83836   25.18936   1.582 0.118605    
+    ## MktRF        1.72708    0.43561   3.965 0.000186 ***
+    ## SMB          0.04598    0.85553   0.054 0.957299    
+    ## HML          0.15818    0.71941   0.220 0.826659    
+    ## RMW         -1.33741    0.98256  -1.361 0.178166    
+    ## CMA         -0.84894    1.02580  -0.828 0.410928    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 213.2 on 55 degrees of freedom
-    ## Multiple R-squared:   0.27,  Adjusted R-squared:  0.2037 
-    ## F-statistic: 4.069 on 5 and 55 DF,  p-value: 0.003255
+    ## Residual standard error: 201 on 65 degrees of freedom
+    ## Multiple R-squared:  0.2861, Adjusted R-squared:  0.2312 
+    ## F-statistic:  5.21 on 5 and 65 DF,  p-value: 0.0004404
 
 ``` r
 # GBTC FF5 regression
@@ -973,23 +952,23 @@ summary(FF5reg_GBTC)
     ## lm(formula = GBTCxs ~ MktRF + SMB + HML + RMW + CMA, data = assets_ff5)
     ## 
     ## Residuals:
-    ##    Min     1Q Median     3Q    Max 
-    ## -482.6 -159.1    3.4  168.1  769.0 
+    ##     Min      1Q  Median      3Q     Max 
+    ## -484.87 -136.29    7.89  147.34  776.33 
     ## 
     ## Coefficients:
     ##             Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)  32.8657    32.7390   1.004 0.319836    
-    ## MktRF         2.1273     0.5450   3.903 0.000261 ***
-    ## SMB          -0.6290     1.1428  -0.550 0.584252    
-    ## HML           0.1861     0.8845   0.210 0.834095    
-    ## RMW          -1.6069     1.2404  -1.295 0.200559    
-    ## CMA          -1.1835     1.2639  -0.936 0.353150    
+    ## (Intercept)  28.7904    28.7239   1.002    0.320    
+    ## MktRF         2.1083     0.4967   4.244 7.11e-05 ***
+    ## SMB          -0.2956     0.9756  -0.303    0.763    
+    ## HML           0.1470     0.8204   0.179    0.858    
+    ## RMW          -1.5363     1.1204  -1.371    0.175    
+    ## CMA          -1.1442     1.1697  -0.978    0.332    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 242.6 on 55 degrees of freedom
-    ## Multiple R-squared:  0.2933, Adjusted R-squared:  0.229 
-    ## F-statistic: 4.565 on 5 and 55 DF,  p-value: 0.001491
+    ## Residual standard error: 229.2 on 65 degrees of freedom
+    ## Multiple R-squared:  0.3017, Adjusted R-squared:  0.248 
+    ## F-statistic: 5.617 on 5 and 65 DF,  p-value: 0.0002308
 
 ``` r
 # MSTR FF5 regression
@@ -1003,22 +982,22 @@ summary(FF5reg_MSTR)
     ## 
     ## Residuals:
     ##     Min      1Q  Median      3Q     Max 
-    ## -389.54 -168.75    2.18  116.46  580.47 
+    ## -379.94 -187.78    5.04  130.67  598.57 
     ## 
     ## Coefficients:
     ##             Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)  26.7342    29.0601   0.920   0.3616    
-    ## MktRF         2.4716     0.4838   5.109 4.19e-06 ***
-    ## SMB           1.4971     1.0144   1.476   0.1457    
-    ## HML          -1.1280     0.7851  -1.437   0.1565    
-    ## RMW          -2.6695     1.1010  -2.425   0.0186 *  
-    ## CMA           0.1120     1.1218   0.100   0.9208    
+    ## (Intercept) 37.88120   29.18701   1.298   0.1989    
+    ## MktRF        2.62876    0.50475   5.208  2.1e-06 ***
+    ## SMB          1.66720    0.99131   1.682   0.0974 .  
+    ## HML         -0.88047    0.83358  -1.056   0.2948    
+    ## RMW         -2.79490    1.13849  -2.455   0.0168 *  
+    ## CMA         -0.03607    1.18859  -0.030   0.9759    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 215.4 on 55 degrees of freedom
-    ## Multiple R-squared:  0.5178, Adjusted R-squared:  0.474 
-    ## F-statistic: 11.81 on 5 and 55 DF,  p-value: 8.799e-08
+    ## Residual standard error: 232.9 on 65 degrees of freedom
+    ## Multiple R-squared:  0.4882, Adjusted R-squared:  0.4488 
+    ## F-statistic:  12.4 on 5 and 65 DF,  p-value: 1.853e-08
 
 ``` r
 # Ethereum FF5 Regression
@@ -1032,22 +1011,22 @@ summary(FF5reg_ETH)
     ## 
     ## Residuals:
     ##     Min      1Q  Median      3Q     Max 
-    ## -537.18 -150.21    7.31  128.43  764.13 
+    ## -539.68 -143.14   -1.88  108.14  778.20 
     ## 
     ## Coefficients:
     ##             Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)  40.6452    34.1676   1.190 0.239320    
-    ## MktRF         2.3816     0.5688   4.187 0.000103 ***
-    ## SMB           0.5211     1.1927   0.437 0.663892    
-    ## HML          -0.1846     0.9231  -0.200 0.842252    
-    ## RMW          -0.7839     1.2945  -0.606 0.547303    
-    ## CMA          -0.2469     1.3190  -0.187 0.852180    
+    ## (Intercept)  29.7452    30.2402   0.984    0.329    
+    ## MktRF         2.4000     0.5230   4.589 2.09e-05 ***
+    ## SMB           0.8490     1.0271   0.827    0.411    
+    ## HML          -0.3216     0.8637  -0.372    0.711    
+    ## RMW          -0.6706     1.1796  -0.568    0.572    
+    ## CMA          -0.1833     1.2315  -0.149    0.882    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 253.2 on 55 degrees of freedom
-    ## Multiple R-squared:  0.3216, Adjusted R-squared:   0.26 
-    ## F-statistic: 5.215 on 5 and 55 DF,  p-value: 0.0005467
+    ## Residual standard error: 241.3 on 65 degrees of freedom
+    ## Multiple R-squared:  0.3385, Adjusted R-squared:  0.2876 
+    ## F-statistic: 6.651 on 5 and 65 DF,  p-value: 4.662e-05
 
 ``` r
 # Wrapped Bitcoin FF5 Regression
@@ -1061,22 +1040,22 @@ summary(FF5reg_WBTC)
     ## 
     ## Residuals:
     ##     Min      1Q  Median      3Q     Max 
-    ## -509.87 -130.97  -20.42  123.23  688.76 
+    ## -513.38 -120.05    5.37  101.43  694.90 
     ## 
     ## Coefficients:
     ##             Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)  41.9920    28.8989   1.453 0.151887    
-    ## MktRF         1.7579     0.4811   3.654 0.000577 ***
-    ## SMB          -0.3133     1.0088  -0.311 0.757280    
-    ## HML           0.1800     0.7808   0.230 0.818559    
-    ## RMW          -1.4775     1.0949  -1.349 0.182716    
-    ## CMA          -0.8180     1.1156  -0.733 0.466519    
+    ## (Intercept) 40.00483   25.30602   1.581 0.118768    
+    ## MktRF        1.75272    0.43763   4.005 0.000162 ***
+    ## SMB         -0.03644    0.85950  -0.042 0.966313    
+    ## HML          0.16588    0.72274   0.230 0.819184    
+    ## RMW         -1.45188    0.98711  -1.471 0.146160    
+    ## CMA         -0.79736    1.03055  -0.774 0.441900    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 214.2 on 55 degrees of freedom
-    ## Multiple R-squared:  0.2699, Adjusted R-squared:  0.2036 
-    ## F-statistic: 4.067 on 5 and 55 DF,  p-value: 0.003263
+    ## Residual standard error: 201.9 on 65 degrees of freedom
+    ## Multiple R-squared:  0.2852, Adjusted R-squared:  0.2302 
+    ## F-statistic: 5.186 on 5 and 65 DF,  p-value: 0.0004579
 
 ### Other Bitcoin-Related Factors
 
@@ -1149,18 +1128,21 @@ adf.test(volumeBTCmonth$avgDailyVolume)
     ##  Augmented Dickey-Fuller Test
     ## 
     ## data:  volumeBTCmonth$avgDailyVolume
-    ## Dickey-Fuller = -2.5297, Lag order = 3, p-value = 0.3603
+    ## Dickey-Fuller = -2.7302, Lag order = 4, p-value = 0.2773
     ## alternative hypothesis: stationary
 
 ``` r
 adf.test(volumeBTCmonth$VolGrowthBTC[-1])
 ```
 
+    ## Warning in adf.test(volumeBTCmonth$VolGrowthBTC[-1]): p-value smaller than
+    ## printed p-value
+
     ## 
     ##  Augmented Dickey-Fuller Test
     ## 
     ## data:  volumeBTCmonth$VolGrowthBTC[-1]
-    ## Dickey-Fuller = -3.9695, Lag order = 3, p-value = 0.01679
+    ## Dickey-Fuller = -4.7615, Lag order = 4, p-value = 0.01
     ## alternative hypothesis: stationary
 
 ``` r
@@ -1172,7 +1154,7 @@ adf.test(volumeGBTCmonth$avgDailyVolume)
     ##  Augmented Dickey-Fuller Test
     ## 
     ## data:  volumeGBTCmonth$avgDailyVolume
-    ## Dickey-Fuller = -2.0932, Lag order = 3, p-value = 0.5372
+    ## Dickey-Fuller = -2.5345, Lag order = 4, p-value = 0.3572
     ## alternative hypothesis: stationary
 
 ``` r
@@ -1186,7 +1168,7 @@ adf.test(volumeGBTCmonth$VolGrowthGBTC[-1])
     ##  Augmented Dickey-Fuller Test
     ## 
     ## data:  volumeGBTCmonth$VolGrowthGBTC[-1]
-    ## Dickey-Fuller = -5.0733, Lag order = 3, p-value = 0.01
+    ## Dickey-Fuller = -4.4964, Lag order = 4, p-value = 0.01
     ## alternative hypothesis: stationary
 
 ``` r
@@ -1198,7 +1180,7 @@ adf.test(volumeMSTRmonth$avgDailyVolume)
     ##  Augmented Dickey-Fuller Test
     ## 
     ## data:  volumeMSTRmonth$avgDailyVolume
-    ## Dickey-Fuller = -1.6978, Lag order = 3, p-value = 0.6974
+    ## Dickey-Fuller = -3.7927, Lag order = 4, p-value = 0.02367
     ## alternative hypothesis: stationary
 
 ``` r
@@ -1212,7 +1194,7 @@ adf.test(volumeMSTRmonth$VolGrowthMSTR[-1])
     ##  Augmented Dickey-Fuller Test
     ## 
     ## data:  volumeMSTRmonth$VolGrowthMSTR[-1]
-    ## Dickey-Fuller = -4.4028, Lag order = 3, p-value = 0.01
+    ## Dickey-Fuller = -4.3006, Lag order = 4, p-value = 0.01
     ## alternative hypothesis: stationary
 
 ``` r
@@ -1224,18 +1206,21 @@ adf.test(volumeETHmonth$avgDailyVolume)
     ##  Augmented Dickey-Fuller Test
     ## 
     ## data:  volumeETHmonth$avgDailyVolume
-    ## Dickey-Fuller = -1.9681, Lag order = 3, p-value = 0.5879
+    ## Dickey-Fuller = -2.3365, Lag order = 4, p-value = 0.4381
     ## alternative hypothesis: stationary
 
 ``` r
 adf.test(volumeETHmonth$VolGrowthETH[-1])
 ```
 
+    ## Warning in adf.test(volumeETHmonth$VolGrowthETH[-1]): p-value smaller than
+    ## printed p-value
+
     ## 
     ##  Augmented Dickey-Fuller Test
     ## 
     ## data:  volumeETHmonth$VolGrowthETH[-1]
-    ## Dickey-Fuller = -4.0102, Lag order = 3, p-value = 0.015
+    ## Dickey-Fuller = -4.4547, Lag order = 4, p-value = 0.01
     ## alternative hypothesis: stationary
 
 ``` r
@@ -1247,18 +1232,21 @@ adf.test(volumeWBTCmonth$avgDailyVolume)
     ##  Augmented Dickey-Fuller Test
     ## 
     ## data:  volumeWBTCmonth$avgDailyVolume
-    ## Dickey-Fuller = -1.7257, Lag order = 3, p-value = 0.6861
+    ## Dickey-Fuller = -2.1074, Lag order = 4, p-value = 0.5317
     ## alternative hypothesis: stationary
 
 ``` r
 adf.test(volumeWBTCmonth$VolGrowthWBTC[-1])
 ```
 
+    ## Warning in adf.test(volumeWBTCmonth$VolGrowthWBTC[-1]): p-value smaller than
+    ## printed p-value
+
     ## 
     ##  Augmented Dickey-Fuller Test
     ## 
     ## data:  volumeWBTCmonth$VolGrowthWBTC[-1]
-    ## Dickey-Fuller = -3.08, Lag order = 3, p-value = 0.1376
+    ## Dickey-Fuller = -4.1311, Lag order = 4, p-value = 0.01
     ## alternative hypothesis: stationary
 
 Now let’s merge the volume growth data to the asset returns and FF5
@@ -1286,55 +1274,55 @@ cor(assets_volregs[,-c(1:5)]) |> round(2)
 ```
 
     ##               MktRF   SMB   HML   RMW   CMA    RF BTCxs GBTCxs MSTRxs ETHxs
-    ## MktRF          1.00  0.34  0.05  0.08 -0.20 -0.02  0.48   0.49   0.57  0.55
-    ## SMB            0.34  1.00  0.36 -0.38  0.03 -0.17  0.20   0.16   0.41  0.26
-    ## HML            0.05  0.36  1.00  0.19  0.66 -0.13 -0.07  -0.10  -0.16 -0.02
-    ## RMW            0.08 -0.38  0.19  1.00  0.18 -0.10 -0.14  -0.13  -0.35 -0.08
-    ## CMA           -0.20  0.03  0.66  0.18  1.00 -0.21 -0.23  -0.26  -0.28 -0.17
-    ## RF            -0.02 -0.17 -0.13 -0.10 -0.21  1.00  0.06   0.15   0.10 -0.07
-    ## BTCxs          0.48  0.20 -0.07 -0.14 -0.23  0.06  1.00   0.96   0.65  0.78
-    ## GBTCxs         0.49  0.16 -0.10 -0.13 -0.26  0.15  0.96   1.00   0.66  0.77
-    ## MSTRxs         0.57  0.41 -0.16 -0.35 -0.28  0.10  0.65   0.66   1.00  0.63
-    ## ETHxs          0.55  0.26 -0.02 -0.08 -0.17 -0.07  0.78   0.77   0.63  1.00
-    ## WBTCxs         0.47  0.20 -0.07 -0.15 -0.22  0.06  1.00   0.96   0.65  0.78
-    ## VolGrowthBTC   0.00  0.05 -0.05 -0.21 -0.20  0.05  0.17   0.19   0.14  0.21
-    ## VolGrowthGBTC  0.10 -0.06  0.02  0.05 -0.01  0.12  0.09   0.19  -0.08  0.05
-    ## VolGrowthMSTR  0.09  0.06 -0.02 -0.15  0.05 -0.02  0.03   0.04   0.17 -0.07
-    ## VolGrowthETH   0.10  0.10  0.01 -0.14 -0.10  0.04  0.13   0.16   0.22  0.36
-    ## VolGrowthWBTC -0.06 -0.05 -0.08 -0.01 -0.16 -0.11  0.05   0.04  -0.05  0.03
+    ## MktRF          1.00  0.34  0.06  0.06 -0.21 -0.02  0.49   0.50   0.57  0.56
+    ## SMB            0.34  1.00  0.39 -0.38  0.02 -0.13  0.24   0.20   0.42  0.29
+    ## HML            0.06  0.39  1.00  0.17  0.65 -0.11 -0.04  -0.08  -0.09 -0.01
+    ## RMW            0.06 -0.38  0.17  1.00  0.16 -0.08 -0.16  -0.14  -0.34 -0.10
+    ## CMA           -0.21  0.02  0.65  0.16  1.00 -0.21 -0.23  -0.26  -0.25 -0.18
+    ## RF            -0.02 -0.13 -0.11 -0.08 -0.21  1.00  0.03   0.10   0.12 -0.11
+    ## BTCxs          0.49  0.24 -0.04 -0.16 -0.23  0.03  1.00   0.96   0.66  0.79
+    ## GBTCxs         0.50  0.20 -0.08 -0.14 -0.26  0.10  0.96   1.00   0.66  0.78
+    ## MSTRxs         0.57  0.42 -0.09 -0.34 -0.25  0.12  0.66   0.66   1.00  0.63
+    ## ETHxs          0.56  0.29 -0.01 -0.10 -0.18 -0.11  0.79   0.78   0.63  1.00
+    ## WBTCxs         0.49  0.24 -0.04 -0.17 -0.22  0.03  1.00   0.96   0.66  0.79
+    ## VolGrowthBTC   0.06  0.14  0.02 -0.24 -0.16  0.07  0.23   0.24   0.25  0.25
+    ## VolGrowthGBTC  0.13  0.00  0.06  0.00  0.03  0.03  0.14   0.23   0.02  0.09
+    ## VolGrowthMSTR  0.14  0.11  0.03 -0.19  0.06 -0.02  0.12   0.12   0.31  0.01
+    ## VolGrowthETH   0.14  0.17  0.05 -0.18 -0.10  0.06  0.19   0.21   0.29  0.38
+    ## VolGrowthWBTC -0.03  0.03 -0.03 -0.03 -0.14 -0.12  0.09   0.08   0.02  0.07
     ##               WBTCxs VolGrowthBTC VolGrowthGBTC VolGrowthMSTR VolGrowthETH
-    ## MktRF           0.47         0.00          0.10          0.09         0.10
-    ## SMB             0.20         0.05         -0.06          0.06         0.10
-    ## HML            -0.07        -0.05          0.02         -0.02         0.01
-    ## RMW            -0.15        -0.21          0.05         -0.15        -0.14
-    ## CMA            -0.22        -0.20         -0.01          0.05        -0.10
-    ## RF              0.06         0.05          0.12         -0.02         0.04
-    ## BTCxs           1.00         0.17          0.09          0.03         0.13
-    ## GBTCxs          0.96         0.19          0.19          0.04         0.16
-    ## MSTRxs          0.65         0.14         -0.08          0.17         0.22
-    ## ETHxs           0.78         0.21          0.05         -0.07         0.36
-    ## WBTCxs          1.00         0.16          0.09          0.02         0.12
-    ## VolGrowthBTC    0.16         1.00          0.49          0.33         0.85
-    ## VolGrowthGBTC   0.09         0.49          1.00          0.31         0.39
-    ## VolGrowthMSTR   0.02         0.33          0.31          1.00         0.28
-    ## VolGrowthETH    0.12         0.85          0.39          0.28         1.00
-    ## VolGrowthWBTC   0.04         0.56          0.24          0.40         0.49
+    ## MktRF           0.49         0.06          0.13          0.14         0.14
+    ## SMB             0.24         0.14          0.00          0.11         0.17
+    ## HML            -0.04         0.02          0.06          0.03         0.05
+    ## RMW            -0.17        -0.24          0.00         -0.19        -0.18
+    ## CMA            -0.22        -0.16          0.03          0.06        -0.10
+    ## RF              0.03         0.07          0.03         -0.02         0.06
+    ## BTCxs           1.00         0.23          0.14          0.12         0.19
+    ## GBTCxs          0.96         0.24          0.23          0.12         0.21
+    ## MSTRxs          0.66         0.25          0.02          0.31         0.29
+    ## ETHxs           0.79         0.25          0.09          0.01         0.38
+    ## WBTCxs          1.00         0.22          0.14          0.11         0.18
+    ## VolGrowthBTC    0.22         1.00          0.54          0.42         0.87
+    ## VolGrowthGBTC   0.14         0.54          1.00          0.39         0.44
+    ## VolGrowthMSTR   0.11         0.42          0.39          1.00         0.35
+    ## VolGrowthETH    0.18         0.87          0.44          0.35         1.00
+    ## VolGrowthWBTC   0.08         0.58          0.30          0.42         0.52
     ##               VolGrowthWBTC
-    ## MktRF                 -0.06
-    ## SMB                   -0.05
-    ## HML                   -0.08
-    ## RMW                   -0.01
-    ## CMA                   -0.16
-    ## RF                    -0.11
-    ## BTCxs                  0.05
-    ## GBTCxs                 0.04
-    ## MSTRxs                -0.05
-    ## ETHxs                  0.03
-    ## WBTCxs                 0.04
-    ## VolGrowthBTC           0.56
-    ## VolGrowthGBTC          0.24
-    ## VolGrowthMSTR          0.40
-    ## VolGrowthETH           0.49
+    ## MktRF                 -0.03
+    ## SMB                    0.03
+    ## HML                   -0.03
+    ## RMW                   -0.03
+    ## CMA                   -0.14
+    ## RF                    -0.12
+    ## BTCxs                  0.09
+    ## GBTCxs                 0.08
+    ## MSTRxs                 0.02
+    ## ETHxs                  0.07
+    ## WBTCxs                 0.08
+    ## VolGrowthBTC           0.58
+    ## VolGrowthGBTC          0.30
+    ## VolGrowthMSTR          0.42
+    ## VolGrowthETH           0.52
     ## VolGrowthWBTC          1.00
 
 ``` r
@@ -1355,19 +1343,19 @@ summary(volreg_BTC)
     ## 
     ## Residuals:
     ##     Min      1Q  Median      3Q     Max 
-    ## -571.20 -127.11  -18.14  133.27  647.69 
+    ## -573.39 -124.70    1.21  128.51  643.51 
     ## 
     ## Coefficients:
     ##               Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)   26.06843   28.84452   0.904 0.369863    
-    ## MktRF          1.75420    0.42037   4.173 0.000102 ***
-    ## VolGrowthWBTC  0.02508    0.03665   0.684 0.496498    
+    ## (Intercept)   22.63054   25.19059   0.898    0.372    
+    ## MktRF          1.81255    0.38594   4.697 1.33e-05 ***
+    ## VolGrowthWBTC  0.03385    0.03321   1.019    0.312    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 212.8 on 58 degrees of freedom
-    ## Multiple R-squared:  0.2328, Adjusted R-squared:  0.2064 
-    ## F-statistic: 8.801 on 2 and 58 DF,  p-value: 0.0004593
+    ## Residual standard error: 201.2 on 68 degrees of freedom
+    ## Multiple R-squared:  0.2516, Adjusted R-squared:  0.2296 
+    ## F-statistic: 11.43 on 2 and 68 DF,  p-value: 5.248e-05
 
 ``` r
 # GBTC Volume Growth regression
@@ -1381,19 +1369,19 @@ summary(volreg_GBTC)
     ## 
     ## Residuals:
     ##     Min      1Q  Median      3Q     Max 
-    ## -577.74 -148.95    3.41  160.23  740.11 
+    ## -577.55 -123.35    5.04  123.97  742.80 
     ## 
     ## Coefficients:
     ##               Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)   18.66899   31.60801   0.591    0.557    
-    ## MktRF          2.01992    0.47742   4.231 8.38e-05 ***
-    ## VolGrowthGBTC  0.07857    0.06022   1.305    0.197    
+    ## (Intercept)   17.09614   27.65194   0.618    0.538    
+    ## MktRF          2.04809    0.44000   4.655 1.55e-05 ***
+    ## VolGrowthGBTC  0.08247    0.05262   1.567    0.122    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 241 on 58 degrees of freedom
-    ## Multiple R-squared:  0.2646, Adjusted R-squared:  0.2393 
-    ## F-statistic: 10.44 on 2 and 58 DF,  p-value: 0.0001345
+    ## Residual standard error: 227.5 on 68 degrees of freedom
+    ## Multiple R-squared:  0.2803, Adjusted R-squared:  0.2591 
+    ## F-statistic: 13.24 on 2 and 68 DF,  p-value: 1.392e-05
 
 ``` r
 # MSTR Volume Growth regression
@@ -1407,19 +1395,19 @@ summary(volreg_MSTR)
     ## 
     ## Residuals:
     ##     Min      1Q  Median      3Q     Max 
-    ## -576.33 -145.77   -0.05  133.48  679.00 
+    ## -659.15 -160.05    2.59  151.35  649.62 
     ## 
     ## Coefficients:
     ##               Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)    2.64081   31.99040   0.083    0.934    
-    ## MktRF          2.55752    0.48380   5.286 1.97e-06 ***
-    ## VolGrowthMSTR  0.07227    0.06324   1.143    0.258    
+    ## (Intercept)    9.23242   30.50956   0.303   0.7631    
+    ## MktRF          2.69899    0.48599   5.554 5.03e-07 ***
+    ## VolGrowthMSTR  0.14411    0.05916   2.436   0.0175 *  
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 244.5 on 58 degrees of freedom
-    ## Multiple R-squared:  0.3449, Adjusted R-squared:  0.3223 
-    ## F-statistic: 15.27 on 2 and 58 DF,  p-value: 4.714e-06
+    ## Residual standard error: 250.9 on 68 degrees of freedom
+    ## Multiple R-squared:  0.3784, Adjusted R-squared:  0.3601 
+    ## F-statistic:  20.7 on 2 and 68 DF,  p-value: 9.546e-08
 
 ``` r
 # Ethereum Volume Growth regression
@@ -1432,20 +1420,20 @@ summary(volreg_ETH)
     ## lm(formula = ETHxs ~ MktRF + VolGrowthETH, data = assets_volregs)
     ## 
     ## Residuals:
-    ##     Min      1Q  Median      3Q     Max 
-    ## -489.92 -117.72    1.22  154.91  653.38 
+    ##    Min     1Q Median     3Q    Max 
+    ## -475.8 -121.2  -10.5  119.9  670.7 
     ## 
     ## Coefficients:
     ##              Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)  26.52818   30.52529   0.869  0.38840    
-    ## MktRF         2.33089    0.46176   5.048 4.72e-06 ***
-    ## VolGrowthETH  0.24156    0.08144   2.966  0.00437 ** 
+    ## (Intercept)  13.33232   27.27479   0.489  0.62655    
+    ## MktRF         2.36233    0.43340   5.451 7.53e-07 ***
+    ## VolGrowthETH  0.23840    0.07333   3.251  0.00179 ** 
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 232.9 on 58 degrees of freedom
-    ## Multiple R-squared:  0.3946, Adjusted R-squared:  0.3737 
-    ## F-statistic:  18.9 on 2 and 58 DF,  p-value: 4.774e-07
+    ## Residual standard error: 223.6 on 68 degrees of freedom
+    ## Multiple R-squared:  0.4055, Adjusted R-squared:  0.388 
+    ## F-statistic: 23.19 on 2 and 68 DF,  p-value: 2.095e-08
 
 ``` r
 # Wrapped Bitcoin Volume Growth regression
@@ -1459,19 +1447,19 @@ summary(volreg_WBTC)
     ## 
     ## Residuals:
     ##     Min      1Q  Median      3Q     Max 
-    ## -570.35 -120.99  -15.55  140.34  665.04 
+    ## -572.52 -122.34   -1.85  133.97  660.69 
     ## 
     ## Coefficients:
     ##               Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)   26.85036   29.04285   0.925 0.359052    
-    ## MktRF          1.75283    0.42326   4.141 0.000113 ***
-    ## VolGrowthWBTC  0.02114    0.03691   0.573 0.568917    
+    ## (Intercept)   23.25132   25.36572   0.917    0.363    
+    ## MktRF          1.81093    0.38862   4.660 1.52e-05 ***
+    ## VolGrowthWBTC  0.03014    0.03344   0.901    0.371    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 214.3 on 58 degrees of freedom
-    ## Multiple R-squared:  0.2293, Adjusted R-squared:  0.2027 
-    ## F-statistic: 8.627 on 2 and 58 DF,  p-value: 0.0005248
+    ## Residual standard error: 202.6 on 68 degrees of freedom
+    ## Multiple R-squared:  0.2472, Adjusted R-squared:  0.225 
+    ## F-statistic: 11.16 on 2 and 68 DF,  p-value: 6.426e-05
 
 #### Bitcoin Mining Hashrate as a Factor
 
@@ -1529,7 +1517,7 @@ adf.test(assets_hashregs$avgHashrate)
     ##  Augmented Dickey-Fuller Test
     ## 
     ## data:  assets_hashregs$avgHashrate
-    ## Dickey-Fuller = 1.9729, Lag order = 3, p-value = 0.99
+    ## Dickey-Fuller = 0.87667, Lag order = 4, p-value = 0.99
     ## alternative hypothesis: stationary
 
 ``` r
@@ -1540,7 +1528,7 @@ adf.test(assets_hashregs$HashrateGrowth[-1])
     ##  Augmented Dickey-Fuller Test
     ## 
     ## data:  assets_hashregs$HashrateGrowth[-1]
-    ## Dickey-Fuller = -3.8918, Lag order = 3, p-value = 0.02043
+    ## Dickey-Fuller = -3.8613, Lag order = 4, p-value = 0.02106
     ## alternative hypothesis: stationary
 
 Now let’s generate update the updated correlation matrix and plot:
@@ -1551,33 +1539,33 @@ cor(assets_hashregs[,-c(1:5)]) |> round(2)
 ```
 
     ##                MktRF   SMB   HML   RMW   CMA    RF BTCxs GBTCxs MSTRxs ETHxs
-    ## MktRF           1.00  0.34  0.05  0.08 -0.20 -0.02  0.48   0.49   0.57  0.55
-    ## SMB             0.34  1.00  0.36 -0.38  0.03 -0.17  0.20   0.16   0.41  0.26
-    ## HML             0.05  0.36  1.00  0.19  0.66 -0.13 -0.07  -0.10  -0.16 -0.02
-    ## RMW             0.08 -0.38  0.19  1.00  0.18 -0.10 -0.14  -0.13  -0.35 -0.08
-    ## CMA            -0.20  0.03  0.66  0.18  1.00 -0.21 -0.23  -0.26  -0.28 -0.17
-    ## RF             -0.02 -0.17 -0.13 -0.10 -0.21  1.00  0.06   0.15   0.10 -0.07
-    ## BTCxs           0.48  0.20 -0.07 -0.14 -0.23  0.06  1.00   0.96   0.65  0.78
-    ## GBTCxs          0.49  0.16 -0.10 -0.13 -0.26  0.15  0.96   1.00   0.66  0.77
-    ## MSTRxs          0.57  0.41 -0.16 -0.35 -0.28  0.10  0.65   0.66   1.00  0.63
-    ## ETHxs           0.55  0.26 -0.02 -0.08 -0.17 -0.07  0.78   0.77   0.63  1.00
-    ## WBTCxs          0.47  0.20 -0.07 -0.15 -0.22  0.06  1.00   0.96   0.65  0.78
-    ## avgHashrate     0.02 -0.04  0.06 -0.07 -0.08  0.76  0.00   0.07   0.15 -0.03
-    ## HashrateGrowth -0.02  0.00  0.25 -0.10  0.15  0.17  0.14   0.10   0.02  0.15
+    ## MktRF           1.00  0.34  0.06  0.06 -0.21 -0.02  0.49   0.50   0.57  0.56
+    ## SMB             0.34  1.00  0.39 -0.38  0.02 -0.13  0.24   0.20   0.42  0.29
+    ## HML             0.06  0.39  1.00  0.17  0.65 -0.11 -0.04  -0.08  -0.09 -0.01
+    ## RMW             0.06 -0.38  0.17  1.00  0.16 -0.08 -0.16  -0.14  -0.34 -0.10
+    ## CMA            -0.21  0.02  0.65  0.16  1.00 -0.21 -0.23  -0.26  -0.25 -0.18
+    ## RF             -0.02 -0.13 -0.11 -0.08 -0.21  1.00  0.03   0.10   0.12 -0.11
+    ## BTCxs           0.49  0.24 -0.04 -0.16 -0.23  0.03  1.00   0.96   0.66  0.79
+    ## GBTCxs          0.50  0.20 -0.08 -0.14 -0.26  0.10  0.96   1.00   0.66  0.78
+    ## MSTRxs          0.57  0.42 -0.09 -0.34 -0.25  0.12  0.66   0.66   1.00  0.63
+    ## ETHxs           0.56  0.29 -0.01 -0.10 -0.18 -0.11  0.79   0.78   0.63  1.00
+    ## WBTCxs          0.49  0.24 -0.04 -0.17 -0.22  0.03  1.00   0.96   0.66  0.79
+    ## avgHashrate     0.01 -0.04  0.03 -0.06 -0.11  0.80  0.00   0.03   0.14 -0.08
+    ## HashrateGrowth -0.04  0.01  0.25 -0.11  0.18  0.11  0.14   0.10   0.01  0.14
     ##                WBTCxs avgHashrate HashrateGrowth
-    ## MktRF            0.47        0.02          -0.02
-    ## SMB              0.20       -0.04           0.00
-    ## HML             -0.07        0.06           0.25
-    ## RMW             -0.15       -0.07          -0.10
-    ## CMA             -0.22       -0.08           0.15
-    ## RF               0.06        0.76           0.17
+    ## MktRF            0.49        0.01          -0.04
+    ## SMB              0.24       -0.04           0.01
+    ## HML             -0.04        0.03           0.25
+    ## RMW             -0.17       -0.06          -0.11
+    ## CMA             -0.22       -0.11           0.18
+    ## RF               0.03        0.80           0.11
     ## BTCxs            1.00        0.00           0.14
-    ## GBTCxs           0.96        0.07           0.10
-    ## MSTRxs           0.65        0.15           0.02
-    ## ETHxs            0.78       -0.03           0.15
+    ## GBTCxs           0.96        0.03           0.10
+    ## MSTRxs           0.66        0.14           0.01
+    ## ETHxs            0.79       -0.08           0.14
     ## WBTCxs           1.00        0.00           0.14
-    ## avgHashrate      0.00        1.00           0.07
-    ## HashrateGrowth   0.14        0.07           1.00
+    ## avgHashrate      0.00        1.00           0.01
+    ## HashrateGrowth   0.14        0.01           1.00
 
 ``` r
 corrplot(cor(assets_hashregs[,-c(1:5)]), method="color")
@@ -1600,19 +1588,19 @@ summary(hashreg_BTC)
     ## 
     ## Residuals:
     ##     Min      1Q  Median      3Q     Max 
-    ## -554.63 -134.70  -10.14  114.61  651.60 
+    ## -552.62 -132.74   -9.23  111.30  658.07 
     ## 
     ## Coefficients:
     ##                Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)     11.2375    31.5633   0.356    0.723    
-    ## MktRF            1.7476     0.4154   4.207 9.08e-05 ***
-    ## HashrateGrowth   0.3858     0.2970   1.299    0.199    
+    ## (Intercept)      7.9119    27.9363   0.283    0.778    
+    ## MktRF            1.8268     0.3828   4.773    1e-05 ***
+    ## HashrateGrowth   0.4147     0.2757   1.504    0.137    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 210.6 on 58 degrees of freedom
-    ## Multiple R-squared:  0.2485, Adjusted R-squared:  0.2226 
-    ## F-statistic: 9.589 on 2 and 58 DF,  p-value: 0.0002525
+    ## Residual standard error: 199.4 on 68 degrees of freedom
+    ## Multiple R-squared:  0.2647, Adjusted R-squared:  0.243 
+    ## F-statistic: 12.24 on 2 and 68 DF,  p-value: 2.889e-05
 
 ``` r
 # GBTC Hashrate Growth regression
@@ -1626,19 +1614,19 @@ summary(hashreg_GBTC)
     ## 
     ## Residuals:
     ##     Min      1Q  Median      3Q     Max 
-    ## -549.86 -170.16   16.98  160.75  744.80 
+    ## -546.12 -152.90   19.77  145.05  751.65 
     ## 
     ## Coefficients:
     ##                Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)      4.4789    36.3419   0.123    0.902    
-    ## MktRF            2.0897     0.4783   4.370 5.22e-05 ***
-    ## HashrateGrowth   0.3345     0.3420   0.978    0.332    
+    ## (Intercept)     -0.7830    32.1162  -0.024    0.981    
+    ## MktRF            2.1600     0.4401   4.908 6.04e-06 ***
+    ## HashrateGrowth   0.3702     0.3170   1.168    0.247    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 242.5 on 58 degrees of freedom
-    ## Multiple R-squared:  0.2553, Adjusted R-squared:  0.2296 
-    ## F-statistic: 9.943 on 2 and 58 DF,  p-value: 0.0001936
+    ## Residual standard error: 229.3 on 68 degrees of freedom
+    ## Multiple R-squared:  0.2689, Adjusted R-squared:  0.2474 
+    ## F-statistic: 12.51 on 2 and 68 DF,  p-value: 2.368e-05
 
 ``` r
 # MSTR Hashrate Growth regression
@@ -1652,19 +1640,19 @@ summary(hashreg_MSTR)
     ## 
     ## Residuals:
     ##     Min      1Q  Median      3Q     Max 
-    ## -505.24 -142.02  -15.59  120.61  683.16 
+    ## -526.82 -169.87  -21.11  143.63  658.61 
     ## 
     ## Coefficients:
     ##                Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)     -1.2098    37.0139  -0.033    0.974    
-    ## MktRF            2.6085     0.4871   5.355 1.53e-06 ***
-    ## HashrateGrowth   0.1021     0.3483   0.293    0.771    
+    ## (Intercept)      5.6733    36.6238   0.155    0.877    
+    ## MktRF            2.8720     0.5018   5.723 2.57e-07 ***
+    ## HashrateGrowth   0.1148     0.3615   0.318    0.752    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 247 on 58 degrees of freedom
-    ## Multiple R-squared:  0.3311, Adjusted R-squared:  0.308 
-    ## F-statistic: 14.36 on 2 and 58 DF,  p-value: 8.614e-06
+    ## Residual standard error: 261.5 on 68 degrees of freedom
+    ## Multiple R-squared:  0.3251, Adjusted R-squared:  0.3053 
+    ## F-statistic: 16.38 on 2 and 68 DF,  p-value: 1.561e-06
 
 ``` r
 # Ethereum Hashrate Growth regression
@@ -1678,19 +1666,19 @@ summary(hashreg_ETH)
     ## 
     ## Residuals:
     ##     Min      1Q  Median      3Q     Max 
-    ## -494.32 -136.73   -9.91  134.84  739.89 
+    ## -484.95 -134.24   -6.31  148.31  759.90 
     ## 
     ## Coefficients:
     ##                Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)      5.0678    36.7252   0.138    0.891    
-    ## MktRF            2.4883     0.4833   5.149 3.27e-06 ***
-    ## HashrateGrowth   0.5285     0.3456   1.529    0.132    
+    ## (Intercept)     -5.8449    33.0404  -0.177     0.86    
+    ## MktRF            2.5974     0.4527   5.737 2.43e-07 ***
+    ## HashrateGrowth   0.5284     0.3261   1.620     0.11    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 245.1 on 58 degrees of freedom
-    ## Multiple R-squared:  0.3298, Adjusted R-squared:  0.3067 
-    ## F-statistic: 14.27 on 2 and 58 DF,  p-value: 9.11e-06
+    ## Residual standard error: 235.9 on 68 degrees of freedom
+    ## Multiple R-squared:  0.3386, Adjusted R-squared:  0.3192 
+    ## F-statistic: 17.41 on 2 and 68 DF,  p-value: 7.854e-07
 
 ``` r
 # Wrapped Bitcoin Hashrate Growth regression
@@ -1704,16 +1692,69 @@ summary(hashreg_WBTC)
     ## 
     ## Residuals:
     ##     Min      1Q  Median      3Q     Max 
-    ## -555.19 -134.14  -10.87  128.18  663.46 
+    ## -553.17 -133.82  -11.61  119.49  669.83 
     ## 
     ## Coefficients:
     ##                Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)     10.4702    31.7133   0.330    0.742    
-    ## MktRF            1.7493     0.4173   4.192 9.58e-05 ***
-    ## HashrateGrowth   0.3999     0.2984   1.340    0.185    
+    ## (Intercept)      7.1505    28.0575   0.255    0.800    
+    ## MktRF            1.8272     0.3844   4.753 1.08e-05 ***
+    ## HashrateGrowth   0.4287     0.2769   1.548    0.126    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 211.6 on 58 degrees of freedom
-    ## Multiple R-squared:  0.2482, Adjusted R-squared:  0.2223 
-    ## F-statistic: 9.574 on 2 and 58 DF,  p-value: 0.0002552
+    ## Residual standard error: 200.3 on 68 degrees of freedom
+    ## Multiple R-squared:  0.2641, Adjusted R-squared:  0.2425 
+    ## F-statistic:  12.2 on 2 and 68 DF,  p-value: 2.964e-05
+
+## Final Thoughts
+
+### Grayscale ETF Conversion
+
+The Grayscale Bitcoin Trust (GBTC) is a publicly traded investment
+vehicle that allows investors to gain exposure to Bitcoin without
+directly owning the cryptocurrency. However, it has historically traded
+at a significant premium or discount to the underlying Bitcoin price.
+This was due to the closed-end nature of the fund, which meant that
+shares could not be created or redeemed in the same way as an open-end
+mutual fund or ETF. This led to a lack of arbitrage opportunities and
+allowed the price to deviate from the net asset value (NAV) of the
+underlying Bitcoin.
+
+To demonstrate this with the data, let’s subset down to the BTC and
+GBTC. Then we’ll split the data into two periods: before and after the
+conversion in January 2024. After comparing the return correlations
+between the two periods, we can see how the ETF conversion increased the
+correlation between the two series.
+
+``` r
+# Subset to BTC and GBTC
+gbtc2etf = assetreturns[,c("BTC","GBTC")]
+# Split the data into two periods: before and after the conversion in January 2024
+gbtc2etf_before = gbtc2etf["2019-01-30/2024-01-01"]
+gbtc2etf_after = gbtc2etf["2024-01-01/"]
+# Display number of months in each period
+print(paste("Number of months before conversion:", nrow(gbtc2etf_before)))
+```
+
+    ## [1] "Number of months before conversion: 60"
+
+``` r
+print(paste("Number of months after conversion: ", nrow(gbtc2etf_after)))
+```
+
+    ## [1] "Number of months after conversion:  17"
+
+``` r
+# Calculate correlation for each period
+gbtc2etf_before_corr = cor(gbtc2etf_before)
+gbtc2etf_after_corr = cor(gbtc2etf_after)
+print(paste("Correlation before conversion:", round(gbtc2etf_before_corr[1,2], 4)))
+```
+
+    ## [1] "Correlation before conversion: 0.9585"
+
+``` r
+print(paste("Correlation after conversion: ", round(gbtc2etf_after_corr[1,2], 4)))
+```
+
+    ## [1] "Correlation after conversion:  0.982"

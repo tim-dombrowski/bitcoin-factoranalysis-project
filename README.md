@@ -4,6 +4,28 @@
 
 This project aims to apply some traditional asset pricing models to the return series of bitcoin (BTC) and some related assets. In addition to the traditional Capital Asset Pricing Model (CAPM), we'll apply the Fama/French three-factor model and the Fama/French five-factor model. Beyond these,  we'll also consider some additional factors that may help explain the returns of bitcoin and other cryptocurrencies, such as the mining hashrate, difficulty, and BTC trading volume. For a more in-depth analysis on this topic across a wider range of the crypto market, see [Liu, Tsyvinski, and Wu (2022), "Common Risk Factors in Cryptocurrency," *Journal of Finance*, 77(2): 1133-1177.](https://doi.org/10.1111/jofi.13119)
 
+The assets considered in this project include:
+
+* Bitcoin (BTC)
+  * Spot bitcoin price on [CoinMarketCap](https://coinmarketcap.com/) (via [Yahoo Finance](https://finance.yahoo.com/quote/BTC-USD/) and the [quantmod](https://cran.r-project.org/package=quantmod) R package)
+  * <https://bitcoin.org>
+* Grayscale Bitcoin Trust ETF (GBTC)
+  * Closed-end fund prior to January 2024, converted to exchange-traded fund (ETF) thereafter
+  * Traded on over-the-counter (OTC) market before ETF, then on NYSE Arca after conversion
+  * <https://etfs.grayscale.com/gbtc>
+* MicroStrategy (MSTR)
+  * Publicly-traded company (on Nasdaq) that started acquiring bitcoin in 2020
+  * Started as a business intelligence software company, now is the largest Bitcoin Treasury Company
+  * <https://www.microstrategy.com/en/investor-relations>
+* Ethereum (ETH)
+  * Second-largest cryptocurrency by market capitalization (price via CoinMarketCap)
+  * Smart contract platform that allows developers to build decentralized applications (dApps)
+  * <https://ethereum.org>
+* Wrapped Bitcoin (WBTC)
+  * Ethereum token that represents bitcoin on the Ethereum blockchain (price via CoinMarketCap)
+  * Allows users to use bitcoin in Ethereum-based decentralized finance (DeFi) applications
+  * <https://wbtc.network>
+
 ### Repository Structure
 
 The data work for this project demo is contained in the R Notebook directory of this repository. On GitHub, the webpage within that folder should display the README.md file, which contains the compiled output of the R Notebook. If you wish to explore the source code locally, then you can open the [btcfactors.Rmd](https://github.com/tim-dombrowski/bitcoin-factoranalysis-project/blob/main/R%20Notebook/btcfactors.Rmd) file in RStudio and execute the code chunks to replicate the data work. Note the `output: html_notebook` line in the header of that file, which indicates that the R Markdown document is an R Notebook. 

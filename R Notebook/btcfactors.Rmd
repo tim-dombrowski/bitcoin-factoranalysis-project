@@ -20,6 +20,7 @@ renv::restore(clean=TRUE, lockfile="../renv.lock")
 # Load in the packages
 library(quantmod)
 library(tidyverse)
+library(scales)
 library(corrplot)
 library(jsonlite)
 library(tseries)
@@ -49,7 +50,7 @@ As long as you have downloaded the entire project repository, the renv chunk abo
 
 ```{r setup2, results='hide', message=FALSE, eval=FALSE}
 # Create list of packages needed for this exercise, omit geckor since its not on CRAN
-list.of.packages = c("quantmod","tidyverse","corrplot","jsonlite","tseries","rmarkdown")
+list.of.packages = c("quantmod","tidyverse","scales","corrplot","jsonlite","tseries","rmarkdown")
 # Check if any have not yet been installed
 new.packages = list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
 # If any need to be installed, install them
@@ -57,6 +58,7 @@ if(length(new.packages)) install.packages(new.packages)
 # Load in the packages
 library(quantmod)
 library(tidyverse)
+library(scales)
 library(corrplot)
 library(jsonlite)
 library(tseries)
@@ -239,17 +241,27 @@ First, lets visualize each of the price and return series. For prices, we'll use
 
 ```{r tsplots}
 # Plot the asset prices
-ggplot(data=assetprices, aes(x=index(assetprices), y=BTC)) + geom_line() + xlab("")
-ggplot(data=assetprices, aes(x=index(assetprices), y=GBTC)) + geom_line() + xlab("")
-ggplot(data=assetprices, aes(x=index(assetprices), y=MSTR)) + geom_line() + xlab("")
-ggplot(data=assetprices, aes(x=index(assetprices), y=ETH)) + geom_line() + xlab("")
-ggplot(data=assetprices, aes(x=index(assetprices), y=WBTC)) + geom_line() + xlab("")
+ggplot(data=assetprices, aes(x=index(assetprices), y=BTC)) + geom_line() + xlab("") + 
+  scale_y_continuous(labels = dollar_format()) + ggtitle("Bitcoin (BTC) Price")
+ggplot(data=assetprices, aes(x=index(assetprices), y=GBTC)) + geom_line() + xlab("") + 
+  scale_y_continuous(labels = dollar_format()) + ggtitle("Grayscale Bitcoin Fund/ETF (GBTC) Price")
+ggplot(data=assetprices, aes(x=index(assetprices), y=MSTR)) + geom_line() + xlab("") + 
+  scale_y_continuous(labels = dollar_format()) + ggtitle("Strategy (MSTR) Price")
+ggplot(data=assetprices, aes(x=index(assetprices), y=ETH)) + geom_line() + xlab("") + 
+  scale_y_continuous(labels = dollar_format()) + ggtitle("Ethereum (ETH) Price")
+ggplot(data=assetprices, aes(x=index(assetprices), y=WBTC)) + geom_line() + xlab("") + 
+  scale_y_continuous(labels = dollar_format()) + ggtitle("Wrapped Bitcoin (WBTC) Price")
 # Plot the asset returns
-ggplot(data=assetreturns, aes(x=index(assetreturns), y=BTC)) + geom_col() + xlab("")
-ggplot(data=assetreturns, aes(x=index(assetreturns), y=GBTC)) + geom_col() + xlab("")
-ggplot(data=assetreturns, aes(x=index(assetreturns), y=MSTR)) + geom_col() + xlab("")
-ggplot(data=assetreturns, aes(x=index(assetreturns), y=ETH)) + geom_col() + xlab("")
-ggplot(data=assetreturns, aes(x=index(assetreturns), y=WBTC)) + geom_col() + xlab("")
+ggplot(data=assetreturns, aes(x=index(assetreturns), y=BTC)) + geom_col() + xlab("") + 
+  scale_y_continuous(labels = percent_format(scale=1)) + ggtitle("Bitcoin (BTC) Returns")
+ggplot(data=assetreturns, aes(x=index(assetreturns), y=GBTC)) + geom_col() + xlab("") + 
+  scale_y_continuous(labels = percent_format(scale=1)) + ggtitle("Grayscale Bitcoin Fund/ETF (GBTC) Returns")
+ggplot(data=assetreturns, aes(x=index(assetreturns), y=MSTR)) + geom_col() + xlab("") + 
+  scale_y_continuous(labels = percent_format(scale=1)) + ggtitle("Strategy (MSTR) Returns")
+ggplot(data=assetreturns, aes(x=index(assetreturns), y=ETH)) + geom_col() + xlab("") + 
+  scale_y_continuous(labels = percent_format(scale=1)) + ggtitle("Ethereum (ETH) Returns")
+ggplot(data=assetreturns, aes(x=index(assetreturns), y=WBTC)) + geom_col() + xlab("") + 
+  scale_y_continuous(labels = percent_format(scale=1)) + ggtitle("Wrapped Bitcoin (WBTC) Returns")
 ```
 
 Another way to visualize the returns of each series is to use a density plot. This will allow us to compare the distribution of returns for the assets. The `facet_wrap()` function will allow us to compare the assets side-by-side. *This component of the analysis was recommended by GitHub Copilot.*
@@ -262,7 +274,13 @@ assetreturnsdf = assetreturnsdf |> pivot_longer(cols=-Date, names_to="Asset", va
 # Plot the density of returns
 ggplot(data=assetreturnsdf, aes(x=Return, fill=Asset)) + 
   geom_density(alpha=0.5) + 
-  facet_wrap(~Asset)
+  facet_wrap(~Asset) +
+  scale_x_continuous(labels=percent_format(scale=1)) +
+  xlab("Annualized Return") +
+  scale_y_continuous(labels=percent_format()) +
+  ylab("Density") +
+  ggtitle("Density of Annualized Returns") +
+  theme(legend.position="none")
 ```
 
 ### Univariate Statistics
@@ -584,3 +602,41 @@ summary(hashreg_ETH)
 hashreg_WBTC = lm(WBTCxs~MktRF+HashrateGrowth, data=assets_hashregs)
 summary(hashreg_WBTC)
 ```
+
+
+## Final Thoughts
+
+### Grayscale ETF Conversion
+
+The Grayscale Bitcoin Trust (GBTC) is a publicly traded investment vehicle that allows investors to gain exposure to Bitcoin without directly owning the cryptocurrency. However, it has historically traded at a significant premium or discount to the underlying Bitcoin price. This was due to the closed-end nature of the fund, which meant that shares could not be created or redeemed in the same way as an open-end mutual fund or ETF. This led to a lack of arbitrage opportunities and allowed the price to deviate from the net asset value (NAV) of the underlying Bitcoin.
+
+To demonstrate this with the data, let's subset down to the BTC and GBTC. Then we'll split the data into two periods: before and after the conversion in January 2024. After comparing the return correlations between the two periods, we can see how the ETF conversion increased the correlation between the two series.
+
+```{r gbtc2etf}
+# Subset to BTC and GBTC
+gbtc2etf = assetreturns[,c("BTC","GBTC")]
+# Split the data into two periods: before and after the conversion in January 2024
+gbtc2etf_before = gbtc2etf["2019-01-30/2024-01-01"]
+gbtc2etf_after = gbtc2etf["2024-01-01/"]
+# Display number of months in each period
+print(paste("Number of months before conversion:", nrow(gbtc2etf_before)))
+print(paste("Number of months after conversion: ", nrow(gbtc2etf_after)))
+# Calculate correlation for each period
+gbtc2etf_before_corr = cor(gbtc2etf_before)
+gbtc2etf_after_corr = cor(gbtc2etf_after)
+print(paste("Correlation before conversion:", round(gbtc2etf_before_corr[1,2], 4)))
+print(paste("Correlation after conversion: ", round(gbtc2etf_after_corr[1,2], 4)))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
