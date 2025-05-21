@@ -21,6 +21,7 @@ renv::restore(clean=TRUE, lockfile="../renv.lock")
 library(quantmod)
 library(tidyverse)
 library(scales)
+library(reshape2)
 library(corrplot)
 library(jsonlite)
 library(tseries)
@@ -29,6 +30,8 @@ library(rmarkdown)
 
 * The [quantmod package](https://cran.r-project.org/package=quantmod) contains tools for importing and analyzing financial data.
 * The [tidyverse package](https://www.tidyverse.org/) contains a suite of packages for data manipulation and visualization.
+* The [scales package](https://cran.r-project.org/package=scales) lets us format numbers and dates in plots.
+* The [reshape2 package](https://cran.r-project.org/package=reshape2) contains the `melt` function that will be used.
 * The [corrplot package](https://cran.r-project.org/package=corrplot) lets us create correlation plots.
 * The [jsonlite package](https://cran.r-project.org/package=jsonlite) lets us more easily import JSON data.
 * The [tseries package](https://cran.r-project.org/package=tseries) contains additional time series analysis functions that we will explore.
@@ -303,9 +306,25 @@ assetsSd |> round(2)
 At the multivariate level, we can calculate the correlation matrix for the asset returns. This will allow us to see how the assets move together. We can also create a correlation plot to visualize the relationships.
 
 ```{r assetcorrs}
-cor(assetreturns) |> round(4)
-# Create a correlation plot for the daily returns
-corrplot(cor(assetreturns), method="color")
+# Calculate the correlation matrix for the asset returns
+retcorrs = cor(assetreturns) |> round (4)
+retcorrs
+# Create a correlation plot for the returns
+#corrplot(retcorrs, method="color") # uncomment for a simpler correlation plot with colors reversed
+# Replicate using ggplot2
+retcorrmelt = melt(retcorrs)
+retcorrmelt$Var2 = factor(retcorrmelt$Var2, levels=rev(levels(factor(retcorrmelt$Var2))))
+retcorrplot = ggplot(data=retcorrmelt, aes(x=Var1, y=Var2, fill=value)) + 
+  geom_tile() +
+  geom_text(aes(label = round(value, 2)), color="black", size=4, fontface="bold") +
+  scale_fill_gradient2(low="blue", mid="white", high="red", 
+                       midpoint=0, limit=c(-1, 1), 
+                       space="Lab", name="Correlation") +
+  theme(axis.text.x=element_text(angle=90, vjust=0.5, hjust=1),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank())+
+  ggtitle("Correlation Matrix and Heatmap for Asset Returns")
+retcorrplot
 ```
 
 
@@ -334,8 +353,25 @@ assets_ff3 = assets_ff3[complete.cases(assets_ff3),]
 Before running the regressions, let's calculate the correlation matrix and plot for the asset risk premiums and the factors.
 
 ```{r ff3stats}
-cor(assets_ff3[,-c(1:5)]) |> round(2)
-corrplot(cor(assets_ff3[,-c(1:5)]), method="color")
+# Calculate the correlation matrix
+ff3corrs = cor(assets_ff3[,-c(1:5)]) |> round (4)
+ff3corrs
+# Create a correlation plot for the returns
+#corrplot(ff3corrs, method="color")
+# Replicate using ggplot2
+ff3corrmelt = melt(ff3corrs)
+ff3corrmelt$Var2 = factor(ff3corrmelt$Var2, levels=rev(levels(factor(ff3corrmelt$Var2))))
+ff3corrplot = ggplot(data=ff3corrmelt, aes(x=Var1, y=Var2, fill=value)) + 
+  geom_tile() +
+  geom_text(aes(label = round(value, 2)), color="black", size=4, fontface="bold") +
+  scale_fill_gradient2(low="blue", mid="white", high="red", 
+                       midpoint=0, limit=c(-1, 1), 
+                       space="Lab", name="Correlation") +
+  theme(axis.text.x=element_text(angle=90, vjust=0.5, hjust=1),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank())+
+  ggtitle("Correlation Matrix and Heatmap for Asset Risk Premiums + FF3 Factors")
+ff3corrplot
 ```
 
 #### CAPM Regressions
@@ -405,8 +441,25 @@ assets_ff5 = assets_ff5[complete.cases(assets_ff5),]
 Compute and visualize correlations between assets and factors:
 
 ```{r ff5stats}
-cor(assets_ff5[,-c(1:5)]) |> round(2)
-corrplot(cor(assets_ff5[,-c(1:5)]), method="color")
+# Calculate the correlation matrix
+ff5corrs = cor(assets_ff5[,-c(1:5)]) |> round (4)
+ff5corrs
+# Create a correlation plot for the returns
+#corrplot(ff5corrs, method="color")
+# Replicate using ggplot2
+ff5corrmelt = melt(ff5corrs)
+ff5corrmelt$Var2 = factor(ff5corrmelt$Var2, levels=rev(levels(factor(ff5corrmelt$Var2))))
+ff5corrplot = ggplot(data=ff5corrmelt, aes(x=Var1, y=Var2, fill=value)) + 
+  geom_tile() +
+  geom_text(aes(label = round(value, 2)), color="black", size=4, fontface="bold") +
+  scale_fill_gradient2(low="blue", mid="white", high="red", 
+                       midpoint=0, limit=c(-1, 1), 
+                       space="Lab", name="Correlation") +
+  theme(axis.text.x=element_text(angle=90, vjust=0.5, hjust=1),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank())+
+  ggtitle("Correlation Matrix and Heatmap for Asset Risk Premiums + FF5 Factors")
+ff5corrplot
 ```
 
 Run the FF5 factor regressions:
@@ -514,9 +567,25 @@ assets_volregs = merge(assets_ff5,
                        volumeETHmonth$VolGrowthETH,
                        volumeWBTCmonth$VolGrowthWBTC, 
                        join="inner")
-# Compute correlations and plot
-cor(assets_volregs[,-c(1:5)]) |> round(2)
-corrplot(cor(assets_volregs[,-c(1:5)]), method="color")
+# Calculate the correlation matrix
+volcorrs = cor(assets_volregs[,-c(1:5)]) |> round (4)
+volcorrs
+# Create a correlation plot for the returns
+#corrplot(volcorrs, method="color")
+# Replicate using ggplot2
+volcorrmelt = melt(volcorrs)
+volcorrmelt$Var2 = factor(volcorrmelt$Var2, levels=rev(levels(factor(volcorrmelt$Var2))))
+volcorrplot = ggplot(data=volcorrmelt, aes(x=Var1, y=Var2, fill=value)) + 
+  geom_tile() +
+  geom_text(aes(label = round(value, 2)), color="black", size=3, fontface="bold") +
+  scale_fill_gradient2(low="blue", mid="white", high="red", 
+                       midpoint=0, limit=c(-1, 1), 
+                       space="Lab", name="Correlation") +
+  theme(axis.text.x=element_text(angle=90, vjust=0.5, hjust=1),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank())+
+  ggtitle("Correlation Matrix and Heatmap for Asset Risk Premiums + FF5 Factors + Volume Growth")
+volcorrplot
 # Bitcoin Volume Growth regression
 volreg_BTC = lm(BTCxs~MktRF+VolGrowthWBTC, data=assets_volregs)
 summary(volreg_BTC)
@@ -578,9 +647,25 @@ adf.test(assets_hashregs$HashrateGrowth[-1])
 Now let's generate update the updated correlation matrix and plot:
 
 ```{r hashcors}
-# Compute correlations and plot
-cor(assets_hashregs[,-c(1:5)]) |> round(2)
-corrplot(cor(assets_hashregs[,-c(1:5)]), method="color")
+# Calculate the correlation matrix
+hashcorrs = cor(assets_hashregs[,-c(1:5)]) |> round (4)
+hashcorrs
+# Create a correlation plot for the returns
+#corrplot(hashcorrs, method="color")
+# Replicate using ggplot2
+hashcorrmelt = melt(hashcorrs)
+hashcorrmelt$Var2 = factor(hashcorrmelt$Var2, levels=rev(levels(factor(hashcorrmelt$Var2))))
+hashcorrplot = ggplot(data=hashcorrmelt, aes(x=Var1, y=Var2, fill=value)) + 
+  geom_tile() +
+  geom_text(aes(label = round(value, 2)), color="black", size=3, fontface="bold") +
+  scale_fill_gradient2(low="blue", mid="white", high="red", 
+                       midpoint=0, limit=c(-1, 1), 
+                       space="Lab", name="Correlation") +
+  theme(axis.text.x=element_text(angle=90, vjust=0.5, hjust=1),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank())+
+  ggtitle("Correlation Matrix and Heatmap for Asset Risk Premiums + FF5 Factors + Hashrate Growth")
+hashcorrplot
 ```
 
 Now let's run some factor models with the hashrate growth rates as a factor.

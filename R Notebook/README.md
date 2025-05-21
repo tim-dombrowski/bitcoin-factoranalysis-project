@@ -34,6 +34,7 @@ renv::restore(clean=TRUE, lockfile="../renv.lock")
 library(quantmod)
 library(tidyverse)
 library(scales)
+library(reshape2)
 library(corrplot)
 library(jsonlite)
 library(tseries)
@@ -44,6 +45,10 @@ library(rmarkdown)
   contains tools for importing and analyzing financial data.
 - The [tidyverse package](https://www.tidyverse.org/) contains a suite
   of packages for data manipulation and visualization.
+- The [scales package](https://cran.r-project.org/package=scales) lets
+  us format numbers and dates in plots.
+- The [reshape2 package](https://cran.r-project.org/package=reshape2)
+  contains the `melt` function that will be used.
 - The [corrplot package](https://cran.r-project.org/package=corrplot)
   lets us create correlation plots.
 - The [jsonlite package](https://cran.r-project.org/package=jsonlite)
@@ -501,7 +506,7 @@ assetsEr |> round(2)
 ```
 
     ##   BTC  GBTC  MSTR   ETH  WBTC 
-    ## 54.44 48.20 55.14 49.86 54.33
+    ## 54.37 48.20 55.14 49.79 54.32
 
 ``` r
 # Asset standard deviations
@@ -510,7 +515,7 @@ assetsSd |> round(2)
 ```
 
     ##    BTC   GBTC   MSTR    ETH   WBTC 
-    ## 225.02 258.33 308.68 287.66 225.87
+    ## 224.99 258.33 308.68 287.57 225.87
 
 ``` r
 # Asset risk-adjusted returns
@@ -518,7 +523,7 @@ assetsSd |> round(2)
 ```
 
     ##    BTC   GBTC   MSTR    ETH   WBTC 
-    ## 0.2419 0.1866 0.1786 0.1733 0.2405
+    ## 0.2416 0.1866 0.1786 0.1731 0.2405
 
 ### Multivariate Statistics
 
@@ -528,19 +533,35 @@ together. We can also create a correlation plot to visualize the
 relationships.
 
 ``` r
-cor(assetreturns) |> round(4)
+# Calculate the correlation matrix for the asset returns
+retcorrs = cor(assetreturns) |> round (4)
+retcorrs
 ```
 
     ##         BTC   GBTC   MSTR    ETH   WBTC
-    ## BTC  1.0000 0.9623 0.6692 0.7863 0.9987
-    ## GBTC 0.9623 1.0000 0.6677 0.7723 0.9606
-    ## MSTR 0.6692 0.6677 1.0000 0.6139 0.6655
-    ## ETH  0.7863 0.7723 0.6139 1.0000 0.7846
-    ## WBTC 0.9987 0.9606 0.6655 0.7846 1.0000
+    ## BTC  1.0000 0.9623 0.6692 0.7861 0.9987
+    ## GBTC 0.9623 1.0000 0.6677 0.7724 0.9606
+    ## MSTR 0.6692 0.6677 1.0000 0.6140 0.6655
+    ## ETH  0.7861 0.7724 0.6140 1.0000 0.7847
+    ## WBTC 0.9987 0.9606 0.6655 0.7847 1.0000
 
 ``` r
-# Create a correlation plot for the daily returns
-corrplot(cor(assetreturns), method="color")
+# Create a correlation plot for the returns
+#corrplot(retcorrs, method="color") # uncomment for a simpler correlation plot with colors reversed
+# Replicate using ggplot2
+retcorrmelt = melt(retcorrs)
+retcorrmelt$Var2 = factor(retcorrmelt$Var2, levels=rev(levels(factor(retcorrmelt$Var2))))
+retcorrplot = ggplot(data=retcorrmelt, aes(x=Var1, y=Var2, fill=value)) + 
+  geom_tile() +
+  geom_text(aes(label = round(value, 2)), color="black", size=4, fontface="bold") +
+  scale_fill_gradient2(low="blue", mid="white", high="red", 
+                       midpoint=0, limit=c(-1, 1), 
+                       space="Lab", name="Correlation") +
+  theme(axis.text.x=element_text(angle=90, vjust=0.5, hjust=1),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank())+
+  ggtitle("Correlation Matrix and Heatmap for Asset Returns")
+retcorrplot
 ```
 
 ![](README_files/figure-gfm/assetcorrs-1.png)<!-- -->
@@ -574,22 +595,39 @@ Before running the regressions, let’s calculate the correlation matrix
 and plot for the asset risk premiums and the factors.
 
 ``` r
-cor(assets_ff3[,-c(1:5)]) |> round(2)
+# Calculate the correlation matrix
+ff3corrs = cor(assets_ff3[,-c(1:5)]) |> round (4)
+ff3corrs
 ```
 
-    ##        MktRF   SMB   HML    RF BTCxs GBTCxs MSTRxs ETHxs WBTCxs
-    ## MktRF   1.00  0.31  0.06 -0.02  0.49   0.50   0.57  0.56   0.49
-    ## SMB     0.31  1.00  0.11 -0.12  0.25   0.22   0.47  0.32   0.25
-    ## HML     0.06  0.11  1.00 -0.11 -0.04  -0.08  -0.09 -0.01  -0.04
-    ## RF     -0.02 -0.12 -0.11  1.00  0.03   0.10   0.12 -0.11   0.03
-    ## BTCxs   0.49  0.25 -0.04  0.03  1.00   0.96   0.66  0.79   1.00
-    ## GBTCxs  0.50  0.22 -0.08  0.10  0.96   1.00   0.66  0.78   0.96
-    ## MSTRxs  0.57  0.47 -0.09  0.12  0.66   0.66   1.00  0.63   0.66
-    ## ETHxs   0.56  0.32 -0.01 -0.11  0.79   0.78   0.63  1.00   0.79
-    ## WBTCxs  0.49  0.25 -0.04  0.03  1.00   0.96   0.66  0.79   1.00
+    ##          MktRF     SMB     HML      RF   BTCxs  GBTCxs  MSTRxs   ETHxs  WBTCxs
+    ## MktRF   1.0000  0.3150  0.0563 -0.0176  0.4901  0.5043  0.5693  0.5595  0.4880
+    ## SMB     0.3150  1.0000  0.1145 -0.1214  0.2519  0.2201  0.4721  0.3178  0.2458
+    ## HML     0.0563  0.1145  1.0000 -0.1083 -0.0433 -0.0827 -0.0866 -0.0115 -0.0439
+    ## RF     -0.0176 -0.1214 -0.1083  1.0000  0.0333  0.1040  0.1150 -0.1067  0.0339
+    ## BTCxs   0.4901  0.2519 -0.0433  0.0333  1.0000  0.9616  0.6626  0.7884  0.9986
+    ## GBTCxs  0.5043  0.2201 -0.0827  0.1040  0.9616  1.0000  0.6623  0.7776  0.9599
+    ## MSTRxs  0.5693  0.4721 -0.0866  0.1150  0.6626  0.6623  1.0000  0.6254  0.6588
+    ## ETHxs   0.5595  0.3178 -0.0115 -0.1067  0.7884  0.7776  0.6254  1.0000  0.7871
+    ## WBTCxs  0.4880  0.2458 -0.0439  0.0339  0.9986  0.9599  0.6588  0.7871  1.0000
 
 ``` r
-corrplot(cor(assets_ff3[,-c(1:5)]), method="color")
+# Create a correlation plot for the returns
+#corrplot(ff3corrs, method="color")
+# Replicate using ggplot2
+ff3corrmelt = melt(ff3corrs)
+ff3corrmelt$Var2 = factor(ff3corrmelt$Var2, levels=rev(levels(factor(ff3corrmelt$Var2))))
+ff3corrplot = ggplot(data=ff3corrmelt, aes(x=Var1, y=Var2, fill=value)) + 
+  geom_tile() +
+  geom_text(aes(label = round(value, 2)), color="black", size=4, fontface="bold") +
+  scale_fill_gradient2(low="blue", mid="white", high="red", 
+                       midpoint=0, limit=c(-1, 1), 
+                       space="Lab", name="Correlation") +
+  theme(axis.text.x=element_text(angle=90, vjust=0.5, hjust=1),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank())+
+  ggtitle("Correlation Matrix and Heatmap for Asset Risk Premiums + FF3 Factors")
+ff3corrplot
 ```
 
 ![](README_files/figure-gfm/ff3stats-1.png)<!-- -->
@@ -888,24 +926,53 @@ assets_ff5 = assets_ff5[complete.cases(assets_ff5),]
 Compute and visualize correlations between assets and factors:
 
 ``` r
-cor(assets_ff5[,-c(1:5)]) |> round(2)
+# Calculate the correlation matrix
+ff5corrs = cor(assets_ff5[,-c(1:5)]) |> round (4)
+ff5corrs
 ```
 
-    ##        MktRF   SMB   HML   RMW   CMA    RF BTCxs GBTCxs MSTRxs ETHxs WBTCxs
-    ## MktRF   1.00  0.34  0.06  0.06 -0.21 -0.02  0.49   0.50   0.57  0.56   0.49
-    ## SMB     0.34  1.00  0.39 -0.38  0.02 -0.13  0.24   0.20   0.42  0.29   0.24
-    ## HML     0.06  0.39  1.00  0.17  0.65 -0.11 -0.04  -0.08  -0.09 -0.01  -0.04
-    ## RMW     0.06 -0.38  0.17  1.00  0.16 -0.08 -0.16  -0.14  -0.34 -0.10  -0.17
-    ## CMA    -0.21  0.02  0.65  0.16  1.00 -0.21 -0.23  -0.26  -0.25 -0.18  -0.22
-    ## RF     -0.02 -0.13 -0.11 -0.08 -0.21  1.00  0.03   0.10   0.12 -0.11   0.03
-    ## BTCxs   0.49  0.24 -0.04 -0.16 -0.23  0.03  1.00   0.96   0.66  0.79   1.00
-    ## GBTCxs  0.50  0.20 -0.08 -0.14 -0.26  0.10  0.96   1.00   0.66  0.78   0.96
-    ## MSTRxs  0.57  0.42 -0.09 -0.34 -0.25  0.12  0.66   0.66   1.00  0.63   0.66
-    ## ETHxs   0.56  0.29 -0.01 -0.10 -0.18 -0.11  0.79   0.78   0.63  1.00   0.79
-    ## WBTCxs  0.49  0.24 -0.04 -0.17 -0.22  0.03  1.00   0.96   0.66  0.79   1.00
+    ##          MktRF     SMB     HML     RMW     CMA      RF   BTCxs  GBTCxs  MSTRxs
+    ## MktRF   1.0000  0.3354  0.0563  0.0597 -0.2074 -0.0176  0.4901  0.5043  0.5693
+    ## SMB     0.3354  1.0000  0.3858 -0.3759  0.0181 -0.1314  0.2420  0.1958  0.4248
+    ## HML     0.0563  0.3858  1.0000  0.1651  0.6525 -0.1083 -0.0433 -0.0827 -0.0866
+    ## RMW     0.0597 -0.3759  0.1651  1.0000  0.1589 -0.0793 -0.1601 -0.1429 -0.3350
+    ## CMA    -0.2074  0.0181  0.6525  0.1589  1.0000 -0.2118 -0.2254 -0.2578 -0.2487
+    ## RF     -0.0176 -0.1314 -0.1083 -0.0793 -0.2118  1.0000  0.0333  0.1040  0.1150
+    ## BTCxs   0.4901  0.2420 -0.0433 -0.1601 -0.2254  0.0333  1.0000  0.9616  0.6626
+    ## GBTCxs  0.5043  0.1958 -0.0827 -0.1429 -0.2578  0.1040  0.9616  1.0000  0.6623
+    ## MSTRxs  0.5693  0.4248 -0.0866 -0.3350 -0.2487  0.1150  0.6626  0.6623  1.0000
+    ## ETHxs   0.5595  0.2948 -0.0115 -0.0952 -0.1786 -0.1067  0.7884  0.7776  0.6254
+    ## WBTCxs  0.4880  0.2355 -0.0439 -0.1669 -0.2198  0.0339  0.9986  0.9599  0.6588
+    ##          ETHxs  WBTCxs
+    ## MktRF   0.5595  0.4880
+    ## SMB     0.2948  0.2355
+    ## HML    -0.0115 -0.0439
+    ## RMW    -0.0952 -0.1669
+    ## CMA    -0.1786 -0.2198
+    ## RF     -0.1067  0.0339
+    ## BTCxs   0.7884  0.9986
+    ## GBTCxs  0.7776  0.9599
+    ## MSTRxs  0.6254  0.6588
+    ## ETHxs   1.0000  0.7871
+    ## WBTCxs  0.7871  1.0000
 
 ``` r
-corrplot(cor(assets_ff5[,-c(1:5)]), method="color")
+# Create a correlation plot for the returns
+#corrplot(ff5corrs, method="color")
+# Replicate using ggplot2
+ff5corrmelt = melt(ff5corrs)
+ff5corrmelt$Var2 = factor(ff5corrmelt$Var2, levels=rev(levels(factor(ff5corrmelt$Var2))))
+ff5corrplot = ggplot(data=ff5corrmelt, aes(x=Var1, y=Var2, fill=value)) + 
+  geom_tile() +
+  geom_text(aes(label = round(value, 2)), color="black", size=4, fontface="bold") +
+  scale_fill_gradient2(low="blue", mid="white", high="red", 
+                       midpoint=0, limit=c(-1, 1), 
+                       space="Lab", name="Correlation") +
+  theme(axis.text.x=element_text(angle=90, vjust=0.5, hjust=1),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank())+
+  ggtitle("Correlation Matrix and Heatmap for Asset Risk Premiums + FF5 Factors")
+ff5corrplot
 ```
 
 ![](README_files/figure-gfm/ff5stats-1.png)<!-- -->
@@ -1128,7 +1195,7 @@ adf.test(volumeBTCmonth$avgDailyVolume)
     ##  Augmented Dickey-Fuller Test
     ## 
     ## data:  volumeBTCmonth$avgDailyVolume
-    ## Dickey-Fuller = -2.7302, Lag order = 4, p-value = 0.2773
+    ## Dickey-Fuller = -2.7291, Lag order = 4, p-value = 0.2778
     ## alternative hypothesis: stationary
 
 ``` r
@@ -1142,7 +1209,7 @@ adf.test(volumeBTCmonth$VolGrowthBTC[-1])
     ##  Augmented Dickey-Fuller Test
     ## 
     ## data:  volumeBTCmonth$VolGrowthBTC[-1]
-    ## Dickey-Fuller = -4.7615, Lag order = 4, p-value = 0.01
+    ## Dickey-Fuller = -4.7619, Lag order = 4, p-value = 0.01
     ## alternative hypothesis: stationary
 
 ``` r
@@ -1206,7 +1273,7 @@ adf.test(volumeETHmonth$avgDailyVolume)
     ##  Augmented Dickey-Fuller Test
     ## 
     ## data:  volumeETHmonth$avgDailyVolume
-    ## Dickey-Fuller = -2.3365, Lag order = 4, p-value = 0.4381
+    ## Dickey-Fuller = -2.3366, Lag order = 4, p-value = 0.4381
     ## alternative hypothesis: stationary
 
 ``` r
@@ -1220,7 +1287,7 @@ adf.test(volumeETHmonth$VolGrowthETH[-1])
     ##  Augmented Dickey-Fuller Test
     ## 
     ## data:  volumeETHmonth$VolGrowthETH[-1]
-    ## Dickey-Fuller = -4.4547, Lag order = 4, p-value = 0.01
+    ## Dickey-Fuller = -4.4546, Lag order = 4, p-value = 0.01
     ## alternative hypothesis: stationary
 
 ``` r
@@ -1232,7 +1299,7 @@ adf.test(volumeWBTCmonth$avgDailyVolume)
     ##  Augmented Dickey-Fuller Test
     ## 
     ## data:  volumeWBTCmonth$avgDailyVolume
-    ## Dickey-Fuller = -2.1074, Lag order = 4, p-value = 0.5317
+    ## Dickey-Fuller = -2.1078, Lag order = 4, p-value = 0.5315
     ## alternative hypothesis: stationary
 
 ``` r
@@ -1246,7 +1313,7 @@ adf.test(volumeWBTCmonth$VolGrowthWBTC[-1])
     ##  Augmented Dickey-Fuller Test
     ## 
     ## data:  volumeWBTCmonth$VolGrowthWBTC[-1]
-    ## Dickey-Fuller = -4.1311, Lag order = 4, p-value = 0.01
+    ## Dickey-Fuller = -4.1312, Lag order = 4, p-value = 0.01
     ## alternative hypothesis: stationary
 
 Now let’s merge the volume growth data to the asset returns and FF5
@@ -1269,64 +1336,80 @@ assets_volregs = merge(assets_ff5,
     ## volumeGBTCmonth$VolGrowthGBTC, : 'join' only applicable to two object merges
 
 ``` r
-# Compute correlations and plot
-cor(assets_volregs[,-c(1:5)]) |> round(2)
+# Calculate the correlation matrix
+volcorrs = cor(assets_volregs[,-c(1:5)]) |> round (4)
+volcorrs
 ```
 
-    ##               MktRF   SMB   HML   RMW   CMA    RF BTCxs GBTCxs MSTRxs ETHxs
-    ## MktRF          1.00  0.34  0.06  0.06 -0.21 -0.02  0.49   0.50   0.57  0.56
-    ## SMB            0.34  1.00  0.39 -0.38  0.02 -0.13  0.24   0.20   0.42  0.29
-    ## HML            0.06  0.39  1.00  0.17  0.65 -0.11 -0.04  -0.08  -0.09 -0.01
-    ## RMW            0.06 -0.38  0.17  1.00  0.16 -0.08 -0.16  -0.14  -0.34 -0.10
-    ## CMA           -0.21  0.02  0.65  0.16  1.00 -0.21 -0.23  -0.26  -0.25 -0.18
-    ## RF            -0.02 -0.13 -0.11 -0.08 -0.21  1.00  0.03   0.10   0.12 -0.11
-    ## BTCxs          0.49  0.24 -0.04 -0.16 -0.23  0.03  1.00   0.96   0.66  0.79
-    ## GBTCxs         0.50  0.20 -0.08 -0.14 -0.26  0.10  0.96   1.00   0.66  0.78
-    ## MSTRxs         0.57  0.42 -0.09 -0.34 -0.25  0.12  0.66   0.66   1.00  0.63
-    ## ETHxs          0.56  0.29 -0.01 -0.10 -0.18 -0.11  0.79   0.78   0.63  1.00
-    ## WBTCxs         0.49  0.24 -0.04 -0.17 -0.22  0.03  1.00   0.96   0.66  0.79
-    ## VolGrowthBTC   0.06  0.14  0.02 -0.24 -0.16  0.07  0.23   0.24   0.25  0.25
-    ## VolGrowthGBTC  0.13  0.00  0.06  0.00  0.03  0.03  0.14   0.23   0.02  0.09
-    ## VolGrowthMSTR  0.14  0.11  0.03 -0.19  0.06 -0.02  0.12   0.12   0.31  0.01
-    ## VolGrowthETH   0.14  0.17  0.05 -0.18 -0.10  0.06  0.19   0.21   0.29  0.38
-    ## VolGrowthWBTC -0.03  0.03 -0.03 -0.03 -0.14 -0.12  0.09   0.08   0.02  0.07
-    ##               WBTCxs VolGrowthBTC VolGrowthGBTC VolGrowthMSTR VolGrowthETH
-    ## MktRF           0.49         0.06          0.13          0.14         0.14
-    ## SMB             0.24         0.14          0.00          0.11         0.17
-    ## HML            -0.04         0.02          0.06          0.03         0.05
-    ## RMW            -0.17        -0.24          0.00         -0.19        -0.18
-    ## CMA            -0.22        -0.16          0.03          0.06        -0.10
-    ## RF              0.03         0.07          0.03         -0.02         0.06
-    ## BTCxs           1.00         0.23          0.14          0.12         0.19
-    ## GBTCxs          0.96         0.24          0.23          0.12         0.21
-    ## MSTRxs          0.66         0.25          0.02          0.31         0.29
-    ## ETHxs           0.79         0.25          0.09          0.01         0.38
-    ## WBTCxs          1.00         0.22          0.14          0.11         0.18
-    ## VolGrowthBTC    0.22         1.00          0.54          0.42         0.87
-    ## VolGrowthGBTC   0.14         0.54          1.00          0.39         0.44
-    ## VolGrowthMSTR   0.11         0.42          0.39          1.00         0.35
-    ## VolGrowthETH    0.18         0.87          0.44          0.35         1.00
-    ## VolGrowthWBTC   0.08         0.58          0.30          0.42         0.52
-    ##               VolGrowthWBTC
-    ## MktRF                 -0.03
-    ## SMB                    0.03
-    ## HML                   -0.03
-    ## RMW                   -0.03
-    ## CMA                   -0.14
-    ## RF                    -0.12
-    ## BTCxs                  0.09
-    ## GBTCxs                 0.08
-    ## MSTRxs                 0.02
-    ## ETHxs                  0.07
-    ## WBTCxs                 0.08
-    ## VolGrowthBTC           0.58
-    ## VolGrowthGBTC          0.30
-    ## VolGrowthMSTR          0.42
-    ## VolGrowthETH           0.52
-    ## VolGrowthWBTC          1.00
+    ##                 MktRF     SMB     HML     RMW     CMA      RF   BTCxs  GBTCxs
+    ## MktRF          1.0000  0.3354  0.0563  0.0597 -0.2074 -0.0176  0.4901  0.5043
+    ## SMB            0.3354  1.0000  0.3858 -0.3759  0.0181 -0.1314  0.2420  0.1958
+    ## HML            0.0563  0.3858  1.0000  0.1651  0.6525 -0.1083 -0.0433 -0.0827
+    ## RMW            0.0597 -0.3759  0.1651  1.0000  0.1589 -0.0793 -0.1601 -0.1429
+    ## CMA           -0.2074  0.0181  0.6525  0.1589  1.0000 -0.2118 -0.2254 -0.2578
+    ## RF            -0.0176 -0.1314 -0.1083 -0.0793 -0.2118  1.0000  0.0333  0.1040
+    ## BTCxs          0.4901  0.2420 -0.0433 -0.1601 -0.2254  0.0333  1.0000  0.9616
+    ## GBTCxs         0.5043  0.1958 -0.0827 -0.1429 -0.2578  0.1040  0.9616  1.0000
+    ## MSTRxs         0.5693  0.4248 -0.0866 -0.3350 -0.2487  0.1150  0.6626  0.6623
+    ## ETHxs          0.5595  0.2948 -0.0115 -0.0952 -0.1786 -0.1067  0.7884  0.7776
+    ## WBTCxs         0.4880  0.2355 -0.0439 -0.1669 -0.2198  0.0339  0.9986  0.9599
+    ## VolGrowthBTC   0.0579  0.1380  0.0175 -0.2431 -0.1646  0.0712  0.2306  0.2371
+    ## VolGrowthGBTC  0.1306 -0.0047  0.0619  0.0008  0.0272  0.0271  0.1439  0.2257
+    ## VolGrowthMSTR  0.1404  0.1093  0.0298 -0.1904  0.0582 -0.0219  0.1194  0.1176
+    ## VolGrowthETH   0.1447  0.1680  0.0465 -0.1750 -0.0971  0.0630  0.1903  0.2147
+    ## VolGrowthWBTC -0.0259  0.0280 -0.0336 -0.0277 -0.1428 -0.1236  0.0942  0.0799
+    ##                MSTRxs   ETHxs  WBTCxs VolGrowthBTC VolGrowthGBTC VolGrowthMSTR
+    ## MktRF          0.5693  0.5595  0.4880       0.0579        0.1306        0.1404
+    ## SMB            0.4248  0.2948  0.2355       0.1380       -0.0047        0.1093
+    ## HML           -0.0866 -0.0115 -0.0439       0.0175        0.0619        0.0298
+    ## RMW           -0.3350 -0.0952 -0.1669      -0.2431        0.0008       -0.1904
+    ## CMA           -0.2487 -0.1786 -0.2198      -0.1646        0.0272        0.0582
+    ## RF             0.1150 -0.1067  0.0339       0.0712        0.0271       -0.0219
+    ## BTCxs          0.6626  0.7884  0.9986       0.2306        0.1439        0.1194
+    ## GBTCxs         0.6623  0.7776  0.9599       0.2371        0.2257        0.1176
+    ## MSTRxs         1.0000  0.6254  0.6588       0.2458        0.0225        0.3105
+    ## ETHxs          0.6254  1.0000  0.7871       0.2485        0.0872        0.0108
+    ## WBTCxs         0.6588  0.7871  1.0000       0.2216        0.1422        0.1084
+    ## VolGrowthBTC   0.2458  0.2485  0.2216       1.0000        0.5383        0.4173
+    ## VolGrowthGBTC  0.0225  0.0872  0.1422       0.5383        1.0000        0.3865
+    ## VolGrowthMSTR  0.3105  0.0108  0.1084       0.4173        0.3865        1.0000
+    ## VolGrowthETH   0.2908  0.3818  0.1834       0.8665        0.4352        0.3489
+    ## VolGrowthWBTC  0.0219  0.0719  0.0822       0.5815        0.3021        0.4219
+    ##               VolGrowthETH VolGrowthWBTC
+    ## MktRF               0.1447       -0.0259
+    ## SMB                 0.1680        0.0280
+    ## HML                 0.0465       -0.0336
+    ## RMW                -0.1750       -0.0277
+    ## CMA                -0.0971       -0.1428
+    ## RF                  0.0630       -0.1236
+    ## BTCxs               0.1903        0.0942
+    ## GBTCxs              0.2147        0.0799
+    ## MSTRxs              0.2908        0.0219
+    ## ETHxs               0.3818        0.0719
+    ## WBTCxs              0.1834        0.0822
+    ## VolGrowthBTC        0.8665        0.5815
+    ## VolGrowthGBTC       0.4352        0.3021
+    ## VolGrowthMSTR       0.3489        0.4219
+    ## VolGrowthETH        1.0000        0.5195
+    ## VolGrowthWBTC       0.5195        1.0000
 
 ``` r
-corrplot(cor(assets_volregs[,-c(1:5)]), method="color")
+# Create a correlation plot for the returns
+#corrplot(volcorrs, method="color")
+# Replicate using ggplot2
+volcorrmelt = melt(volcorrs)
+volcorrmelt$Var2 = factor(volcorrmelt$Var2, levels=rev(levels(factor(volcorrmelt$Var2))))
+volcorrplot = ggplot(data=volcorrmelt, aes(x=Var1, y=Var2, fill=value)) + 
+  geom_tile() +
+  geom_text(aes(label = round(value, 2)), color="black", size=3, fontface="bold") +
+  scale_fill_gradient2(low="blue", mid="white", high="red", 
+                       midpoint=0, limit=c(-1, 1), 
+                       space="Lab", name="Correlation") +
+  theme(axis.text.x=element_text(angle=90, vjust=0.5, hjust=1),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank())+
+  ggtitle("Correlation Matrix and Heatmap for Asset Risk Premiums + FF5 Factors + Volume Growth")
+volcorrplot
 ```
 
 ![](README_files/figure-gfm/volregs-1.png)<!-- -->
@@ -1534,41 +1617,57 @@ adf.test(assets_hashregs$HashrateGrowth[-1])
 Now let’s generate update the updated correlation matrix and plot:
 
 ``` r
-# Compute correlations and plot
-cor(assets_hashregs[,-c(1:5)]) |> round(2)
+# Calculate the correlation matrix
+hashcorrs = cor(assets_hashregs[,-c(1:5)]) |> round (4)
+hashcorrs
 ```
 
-    ##                MktRF   SMB   HML   RMW   CMA    RF BTCxs GBTCxs MSTRxs ETHxs
-    ## MktRF           1.00  0.34  0.06  0.06 -0.21 -0.02  0.49   0.50   0.57  0.56
-    ## SMB             0.34  1.00  0.39 -0.38  0.02 -0.13  0.24   0.20   0.42  0.29
-    ## HML             0.06  0.39  1.00  0.17  0.65 -0.11 -0.04  -0.08  -0.09 -0.01
-    ## RMW             0.06 -0.38  0.17  1.00  0.16 -0.08 -0.16  -0.14  -0.34 -0.10
-    ## CMA            -0.21  0.02  0.65  0.16  1.00 -0.21 -0.23  -0.26  -0.25 -0.18
-    ## RF             -0.02 -0.13 -0.11 -0.08 -0.21  1.00  0.03   0.10   0.12 -0.11
-    ## BTCxs           0.49  0.24 -0.04 -0.16 -0.23  0.03  1.00   0.96   0.66  0.79
-    ## GBTCxs          0.50  0.20 -0.08 -0.14 -0.26  0.10  0.96   1.00   0.66  0.78
-    ## MSTRxs          0.57  0.42 -0.09 -0.34 -0.25  0.12  0.66   0.66   1.00  0.63
-    ## ETHxs           0.56  0.29 -0.01 -0.10 -0.18 -0.11  0.79   0.78   0.63  1.00
-    ## WBTCxs          0.49  0.24 -0.04 -0.17 -0.22  0.03  1.00   0.96   0.66  0.79
-    ## avgHashrate     0.01 -0.04  0.03 -0.06 -0.11  0.80  0.00   0.03   0.14 -0.08
-    ## HashrateGrowth -0.04  0.01  0.25 -0.11  0.18  0.11  0.14   0.10   0.01  0.14
-    ##                WBTCxs avgHashrate HashrateGrowth
-    ## MktRF            0.49        0.01          -0.04
-    ## SMB              0.24       -0.04           0.01
-    ## HML             -0.04        0.03           0.25
-    ## RMW             -0.17       -0.06          -0.11
-    ## CMA             -0.22       -0.11           0.18
-    ## RF               0.03        0.80           0.11
-    ## BTCxs            1.00        0.00           0.14
-    ## GBTCxs           0.96        0.03           0.10
-    ## MSTRxs           0.66        0.14           0.01
-    ## ETHxs            0.79       -0.08           0.14
-    ## WBTCxs           1.00        0.00           0.14
-    ## avgHashrate      0.00        1.00           0.01
-    ## HashrateGrowth   0.14        0.01           1.00
+    ##                  MktRF     SMB     HML     RMW     CMA      RF   BTCxs  GBTCxs
+    ## MktRF           1.0000  0.3354  0.0563  0.0597 -0.2074 -0.0176  0.4901  0.5043
+    ## SMB             0.3354  1.0000  0.3858 -0.3759  0.0181 -0.1314  0.2420  0.1958
+    ## HML             0.0563  0.3858  1.0000  0.1651  0.6525 -0.1083 -0.0433 -0.0827
+    ## RMW             0.0597 -0.3759  0.1651  1.0000  0.1589 -0.0793 -0.1601 -0.1429
+    ## CMA            -0.2074  0.0181  0.6525  0.1589  1.0000 -0.2118 -0.2254 -0.2578
+    ## RF             -0.0176 -0.1314 -0.1083 -0.0793 -0.2118  1.0000  0.0333  0.1040
+    ## BTCxs           0.4901  0.2420 -0.0433 -0.1601 -0.2254  0.0333  1.0000  0.9616
+    ## GBTCxs          0.5043  0.1958 -0.0827 -0.1429 -0.2578  0.1040  0.9616  1.0000
+    ## MSTRxs          0.5693  0.4248 -0.0866 -0.3350 -0.2487  0.1150  0.6626  0.6623
+    ## ETHxs           0.5595  0.2948 -0.0115 -0.0952 -0.1786 -0.1067  0.7884  0.7776
+    ## WBTCxs          0.4880  0.2355 -0.0439 -0.1669 -0.2198  0.0339  0.9986  0.9599
+    ## avgHashrate     0.0128 -0.0369  0.0274 -0.0557 -0.1125  0.7956 -0.0019  0.0303
+    ## HashrateGrowth -0.0425  0.0095  0.2547 -0.1128  0.1763  0.1108  0.1354  0.0996
+    ##                 MSTRxs   ETHxs  WBTCxs avgHashrate HashrateGrowth
+    ## MktRF           0.5693  0.5595  0.4880      0.0128        -0.0425
+    ## SMB             0.4248  0.2948  0.2355     -0.0369         0.0095
+    ## HML            -0.0866 -0.0115 -0.0439      0.0274         0.2547
+    ## RMW            -0.3350 -0.0952 -0.1669     -0.0557        -0.1128
+    ## CMA            -0.2487 -0.1786 -0.2198     -0.1125         0.1763
+    ## RF              0.1150 -0.1067  0.0339      0.7956         0.1108
+    ## BTCxs           0.6626  0.7884  0.9986     -0.0019         0.1354
+    ## GBTCxs          0.6623  0.7776  0.9599      0.0303         0.0996
+    ## MSTRxs          1.0000  0.6254  0.6588      0.1442         0.0074
+    ## ETHxs           0.6254  1.0000  0.7871     -0.0814         0.1359
+    ## WBTCxs          0.6588  0.7871  1.0000     -0.0019         0.1402
+    ## avgHashrate     0.1442 -0.0814 -0.0019      1.0000         0.0119
+    ## HashrateGrowth  0.0074  0.1359  0.1402      0.0119         1.0000
 
 ``` r
-corrplot(cor(assets_hashregs[,-c(1:5)]), method="color")
+# Create a correlation plot for the returns
+#corrplot(hashcorrs, method="color")
+# Replicate using ggplot2
+hashcorrmelt = melt(hashcorrs)
+hashcorrmelt$Var2 = factor(hashcorrmelt$Var2, levels=rev(levels(factor(hashcorrmelt$Var2))))
+hashcorrplot = ggplot(data=hashcorrmelt, aes(x=Var1, y=Var2, fill=value)) + 
+  geom_tile() +
+  geom_text(aes(label = round(value, 2)), color="black", size=3, fontface="bold") +
+  scale_fill_gradient2(low="blue", mid="white", high="red", 
+                       midpoint=0, limit=c(-1, 1), 
+                       space="Lab", name="Correlation") +
+  theme(axis.text.x=element_text(angle=90, vjust=0.5, hjust=1),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank())+
+  ggtitle("Correlation Matrix and Heatmap for Asset Risk Premiums + FF5 Factors + Hashrate Growth")
+hashcorrplot
 ```
 
 ![](README_files/figure-gfm/hashcors-1.png)<!-- -->
@@ -1757,4 +1856,4 @@ print(paste("Correlation before conversion:", round(gbtc2etf_before_corr[1,2], 4
 print(paste("Correlation after conversion: ", round(gbtc2etf_after_corr[1,2], 4)))
 ```
 
-    ## [1] "Correlation after conversion:  0.982"
+    ## [1] "Correlation after conversion:  0.9821"
